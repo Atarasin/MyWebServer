@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "locker.h": "c",
+        "http_conn.h": "c",
+        "sql_connection_pool.h": "c",
+        "threadpool.h": "c",
+        "string": "cpp",
+        "*.tcc": "c"
+    }
+}

@@ -1,0 +1,44 @@
+body{font-family:'Microsoft Yahei';font-size:12px;color:#666;}
+html,body{height:100%}
+
+/* 登录页 */
+.login_top{width:960px;height:130px;margin:0 auto;}
+.login_logo{display:block;width:193px;height:76px;margin-top:30px;}
+.login_form_bg{width:1518px; height:700px;background:url(../asserts/background.jpg)}
+.no-mp{margin-top:0px;}
+.login_form_wrap{width:960px;height:480px;margin:0 auto;}
+.slogan{width:40px;height:300px;font-size:30px;color:#f0f9e8;text-align:center;line-height:36px;margin:80px 0 0 120px}
+.login_form{width:368px;height:378px;border:1px solid #e8eaee;background-color:rgba(244, 240, 238, 0.932); margin-top:50px; margin-left: 10px;}
+
+.login_title{height:60px;width:308px;margin:10px auto;border-bottom:1px solid #e0e0e0;}
+.login_title h1{font-size:24px;height:60px;line-height:60px;color:#a8a8a8;float:left;font-weight:bold;margin-left:44px;}
+.login_title a{width:100px;height:20px;display:block;font-size:16px;color:#8c8e8b;text-indent:26px;background:url(../asserts/icons.png) left 5px no-repeat;float:left;margin:20px 0 0 36px}
+
+.register_title{height:60px;width:308px;margin:10px auto;border-bottom:1px solid #e0e0e0;}
+.register_title h1{font-size:24px;height:60px;line-height:60px;color:#a8a8a8;float:left;font-weight:bold;margin-left:100px;}
+
+.log_error{font-size:18px;height:60px;line-height:60px;color:#f01212;float:left;font-weight:bold;margin-top:220px;}
+.register_error{font-size:18px;height:60px;line-height:60px;color:#f01212;float:left;font-weight:bold;margin-top:220px;}
+
+.form_input{width:308px;height:250px;margin:20px auto;position:relative;}
+.name_input,.pass_input{width:306px;height:36px;border:1px solid #e0e0e0;background:url(../asserts/icons.png) 280px -41px no-repeat #f8f8f8;outline:none;font-size:14px;text-indent:10px;position: absolute;left:0;top:0}
+.pass_input{top:65px;background-position:280px -95px;}
+
+.more_input{position:absolute;left:0;top:130px;width:100%}
+
+.more_input input{float:left;margin-top:2px;}
+.more_input label{float:left;margin-left:10px;}
+.more_input a{float:right;color:#666}
+.more_input a:hover{color:#ff8800}
+
+.input_submit{width:100%;height:40px;position:absolute;left:0;top:180px;background-color:#47aa34;color:#fff;font-size:22px;border:0px;font-family:'Microsoft Yahei';cursor:pointer;}
+
+/* 资源页 */
+.resource_title{font-size:40px; height:60px;width:308px;margin-top:50px; margin-left: 400px;}
+.picture_form{width:368px;height:100px;border:1px solid #e8eaee;background-color:rgba(209, 233, 240, 0.932); margin-top:50px; margin-left: 300px;}
+.video_form{width:368px;height:100px;border:1px solid #e8eaee;background-color:rgba(244, 240, 238, 0.932); margin-top:50px; margin-left: 300px;}
+.other_form{width:368px;height:100px;border:1px solid #e8eaee;background-color:rgba(238, 244, 243, 0.932); margin-top:50px; margin-left: 300px;}
+
+.picture_submit{width:100%;height:100px;left:0;top:180px;font-size:30px;border:0px;font-family:'Microsoft Yahei';cursor:pointer;}
+.video_submit{width:100%;height:100px;left:0;top:180px;font-size:30px;border:0px;font-family:'Microsoft Yahei';cursor:pointer;}
+.other_submit{width:100%;height:100px;left:0;top:180px;font-size:30px;border:0px;font-family:'Microsoft Yahei';cursor:pointer;}
