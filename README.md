@@ -37,10 +37,17 @@
    INSERT INTO user(username, passwd) VALUES('name', 'passwd');
    ```
 
-2. 修改`main.c`中的数据库连接参数，主要包括MySQL服务器的用户名、登录密码以及数据库名。
+2. 修改`test.cpp`中的服务器的端口号、数据库连接参数(包括MySQL服务器的用户名、登录密码以及数据库名)。
 
    ```c++
-   connPool->init("localhost", "username", "password", "yourdb", 3306, 8);
+   WebServer server(
+        10000,              // 端口号
+        5000,               // 执行一次tick的时间
+        false,              // 日志模型
+        "username",         // MySQL用户名
+        "passward",         // MySQL登录密码
+        "dbname"            // MySQL使用的数据库
+    );
    ```
 
 3. 修改`http_conn.cpp`中的服务器资源路径。
@@ -54,10 +61,11 @@
 ```shell
 cd src
 make
-./server port
+./server
 ```
 
 ## 致谢
 
 - Linux高性能服务器编程
 - [@qinguoyi](https://github.com/qinguoyi/TinyWebServer)
+- [@markparticle](https://github.com/markparticle/WebServer)
