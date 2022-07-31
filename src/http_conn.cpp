@@ -19,7 +19,7 @@ static map<string, string> users;
 static locker m_lock;
 
 int http_conn::m_user_count = 0;
-int http_conn::m_epollfd = -1;
+// int http_conn::m_epollfd = -1;
 
 void http_conn::initmysql_result(connection_pool *connPool) {
     //先从连接池中取一个连接
@@ -55,20 +55,24 @@ void http_conn::close_conn(bool real_close)
 {
     if (real_close && (m_sockfd != -1))
     {
-        removefd(m_epollfd, m_sockfd);
+        // removefd(m_epollfd, m_sockfd);
+        m_epoller->removefd(m_sockfd);
         m_sockfd = -1;
         m_user_count--;
     }
 }
 
 //初始化连接,外部调用初始化套接字地址
-void http_conn::init(int sockfd, const sockaddr_in &addr)
+void http_conn::init(int sockfd, const sockaddr_in &addr, Epoller* epoller)
 {
     m_sockfd = sockfd;
     m_address = addr;
-    //int reuse=1;
-    //setsockopt(m_sockfd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse));
-    addfd(m_epollfd, sockfd, true);
+    m_epoller = epoller;
+    // int reuse=1;
+    // setsockopt(m_sockfd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse));
+    // addfd(m_epollfd, sockfd, true);
+
+    m_epoller->addfd(sockfd, true);
     m_user_count++;
     init();
 }
@@ -486,7 +490,8 @@ bool http_conn::write() {
 
     // 无数据需要发送
     if (bytes_to_send == 0) {
-        modfd(m_epollfd, m_sockfd, EPOLLIN);
+        // modfd(m_epollfd, m_sockfd, EPOLLIN);
+        m_epoller->modfd(m_sockfd, EPOLLIN);
         init();
         return true;
     }
@@ -498,7 +503,8 @@ bool http_conn::write() {
         if (temp < 0) {
             // 若错误为EAGAIN, 说明TCP写缓存中暂时没有空间来接收这些数据, 则等待下一次EPOLLOUT
             if (errno == EAGAIN) {
-                modfd(m_epollfd, m_sockfd, EPOLLOUT);
+                // modfd(m_epollfd, m_sockfd, EPOLLOUT);
+                m_epoller->modfd(m_sockfd, EPOLLOUT);
                 return true;
             }
             unmap();
@@ -522,7 +528,9 @@ bool http_conn::write() {
 
         if (bytes_to_send <= 0) {
             unmap();
-            modfd(m_epollfd, m_sockfd, EPOLLIN);
+            // modfd(m_epollfd, m_sockfd, EPOLLIN);
+            m_epoller->modfd(m_sockfd, EPOLLIN);
+            
 
             if (m_linger) {
                 init();
@@ -662,7 +670,8 @@ void http_conn::process() {
     // 读取并解析客户端请求
     HTTP_CODE read_ret = process_read();
     if (read_ret == NO_REQUEST) {
-        modfd(m_epollfd, m_sockfd, EPOLLIN);
+        // modfd(m_epollfd, m_sockfd, EPOLLIN);
+        m_epoller->modfd(m_sockfd, EPOLLIN);
         return;
     }
     // 根据HTTP_CODE生成响应数据
@@ -671,5 +680,6 @@ void http_conn::process() {
         close_conn();
     }
     // 生成响应数据后, 让改为epoll监听该文件描述符的写事件
-    modfd(m_epollfd, m_sockfd, EPOLLOUT);
+    // modfd(m_epollfd, m_sockfd, EPOLLOUT);
+    m_epoller->modfd(m_sockfd, EPOLLOUT);
 }

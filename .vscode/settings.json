@@ -5,6 +5,17 @@
         "sql_connection_pool.h": "c",
         "threadpool.h": "c",
         "string": "cpp",
-        "*.tcc": "c"
+        "*.tcc": "c",
+        "array": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "utility": "cpp",
+        "cerrno": "cpp",
+        "fstream": "cpp",
+        "deque": "cpp",
+        "list": "cpp",
+        "vector": "cpp",
+        "unordered_map": "cpp",
+        "functional": "cpp"
     }
 }

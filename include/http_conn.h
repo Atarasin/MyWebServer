@@ -28,12 +28,14 @@
 #include "sql_connection_pool.h"
 #include "public.h"
 #include "log.h"
+#include "epoller.h"
 
 class http_conn {
 public:
     static const int FILENAME_LEN = 200;
     static const int READ_BUFFER_SIZE = 2048;
     static const int WRITE_BUFFER_SIZE = 1024;
+
     enum METHOD {
         GET = 0, POST, HEAD, PUT, DELETE, TRACE, OPTIONS, CONNECT, PATH
     };
@@ -76,7 +78,7 @@ public:
     ~http_conn() {}
 
 public:
-    void init(int sockfd, const sockaddr_in &addr);
+    void init(int sockfd, const sockaddr_in &addr, Epoller* epoller);
     void close_conn(bool real_close = true);
     void process();
     bool read_once();   // 将客户端的HTTP请求读取到读缓存中
@@ -115,12 +117,13 @@ private:
     bool add_blank_line();
 
 public:
-    static int m_epollfd;
+    // static int m_epollfd;
     static int m_user_count;    // 目前已经建立的TCP连接数量
     MYSQL *mysql;
 
 private:
     int m_sockfd;
+    Epoller* m_epoller;
     sockaddr_in m_address;
     char m_read_buf[READ_BUFFER_SIZE];      // 读缓存
     int m_read_idx;                         // 读缓存下一个应该存放的数据索引

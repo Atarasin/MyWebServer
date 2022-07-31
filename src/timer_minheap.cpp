@@ -41,9 +41,11 @@ void TimerMinHeap::siftdown(int index) {
 }
 
 // 添加新的定时器
-void TimerMinHeap::add_timer(util_timer* timer) {
+void TimerMinHeap::add_timer(util_timer* timer, const timeoutCBFunct& cb) {
     if (timer == nullptr)
         return;
+
+    timer->cbFunc = cb;
     
     minheap.push_back(timer);
     siftup(minheap.size() - 1);
@@ -82,7 +84,6 @@ void TimerMinHeap::del_timer(util_timer* timer) {
 
 // 删除所有超时的定时器
 void TimerMinHeap::tick() {
-    // printf("the size of timer is %d \n", size());
     if (minheap.empty()) 
         return;
 
@@ -93,11 +94,15 @@ void TimerMinHeap::tick() {
 
     while (!minheap.empty() && minheap.front()->expire < curtime) {
         // 释放当前连接
-        minheap.front()->cb_func(minheap.front()->user_data);
-        // 打印被删除的TCP连接的相关信息
-        // printClientInfo(minheap.front()->user_data->address, false);
+        // minheap.front()->cb_func(minheap.front()->user_data);
+        minheap.front()->cbFunc();
         del_timer(minheap.front());
     }
+}
+
+int TimerMinHeap::doTick() {
+    tick();
+    return delayMS;
 }
 
 int TimerMinHeap::size() {
