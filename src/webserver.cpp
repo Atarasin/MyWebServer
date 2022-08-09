@@ -1,10 +1,10 @@
 #include "../include/webserver.h"
 
-WebServer::WebServer(int port, int timeout, bool isAsynLog, string sqlUser, string sqlPasswd, string sqlDataBaseName) : 
-    port_(port), epoller_(new Epoller()) {
+WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sqlUser, string sqlPasswd, string sqlDataBaseName) : 
+    port_(port), isET_(isET), epoller_(new Epoller()) {
 
     // 初始化监听描述符
-    InitListenSocket();
+    initListenSocket();
 
     timers_ = new TimerMinHeap(timeout);
 
@@ -12,15 +12,15 @@ WebServer::WebServer(int port, int timeout, bool isAsynLog, string sqlUser, stri
     sqlConnPool_ = connection_pool::GetInstance();
     sqlConnPool_->init("localhost", sqlUser, sqlPasswd, sqlDataBaseName, 3306, 8);
     
+    // 初始化用户信息(用户名和密码)
+    initUserCache();
+    
     // 初始化HTTP连接池
-    users_ = new http_conn[maxHttpConns_];
+    users_ = new HttpConnection[maxHttpConns_];
     usersData_ = new client_data[maxHttpConns_];
 
-    // 初始化数据库读取表
-    users_->initmysql_result(sqlConnPool_);
-
     // 初始化线程池
-    threadPool_ = new ThreadPool<http_conn>(sqlConnPool_);
+    threadPool_ = new ThreadPool<taskCallback>();
 
     // 初始化日志
     if (isAsynLog)
@@ -35,18 +35,17 @@ WebServer::~WebServer() {
     delete epoller_;
     delete timers_;
     delete threadPool_;
-    // delete sqlConnPool_;
 
     delete[] users_;
     delete[] usersData_;
 }
 
-void WebServer::InitListenSocket() {
+void WebServer::initListenSocket() {
     listenfd_ = socket(AF_INET, SOCK_STREAM, 0);
     assert(listenfd_ >= 0);
 
     // 监听listenfd事件
-    epoller_->addfd(listenfd_, false);
+    epoller_->addfd(listenfd_, isET_, false, true);
 
     struct sockaddr_in address;
     bzero(&address, sizeof(address));
@@ -63,6 +62,96 @@ void WebServer::InitListenSocket() {
     assert(ret >= 0);
 }
 
+void WebServer::initUserCache() {
+    // 先从连接池中取一个连接
+    MYSQL* mysql = nullptr;
+    connectionRAII mysqlcon(&mysql, sqlConnPool_);
+
+    // 在user表中检索username，passwd数据，浏览器端输入
+    if (mysql_query(mysql, "SELECT username,passwd FROM user")) {
+        LOG_ERROR("SELECT error:%s\n", mysql_error(mysql));
+    }
+
+    // 从表中检索完整的结果集
+    MYSQL_RES* result = mysql_store_result(mysql);
+
+    // 返回结果集中的列数
+    int num_fields = mysql_num_fields(result);
+
+    // 返回所有字段结构的数组
+    MYSQL_FIELD* fields = mysql_fetch_fields(result);
+
+    // 从结果集中获取下一行, 将对应的用户名和密码，存入map中
+    while (MYSQL_ROW row = mysql_fetch_row(result)) {
+        userCache_[string(row[0])] = string(row[1]);
+    }
+
+    // for (auto it = userCache_.begin(); it != userCache_.end(); ++it)
+    //     cout << "user: " << it->first << ", " << "passwd: " << it->second << endl;
+}
+
+bool WebServer::loginVerify(const string& userName, const string& passwd) {
+    // 先查看userCache中是否存在
+    if (userCache_.find(userName) != userCache_.end()) {
+        return userCache_[userName] == passwd ? true : false;
+    }
+
+    // 若不存在, 则查询数据库
+    MYSQL* mysql = nullptr;
+    connectionRAII mysqlcon(&mysql, sqlConnPool_);
+    
+    char order[256] = {0};
+    snprintf(order, 256, "SELECT username,passwd FROM user WHERE username='%s' LIMIT 1", userName.c_str());
+
+    MYSQL_FIELD* fields = nullptr;
+    MYSQL_RES* res = nullptr;
+
+    if (mysql_query(mysql, order)) {
+        mysql_free_result(res);
+        return false;
+    }
+
+    res = mysql_store_result(mysql);
+    fields = mysql_fetch_fields(res);
+
+    MYSQL_ROW row = mysql_fetch_row(res);
+    printf("MYSQL ROW: %s %s", row[0], row[1]);
+    if (passwd != string(row[1]))
+        return false;
+    
+    mysql_free_result(res);
+    
+    updateUserCache(userName, passwd);   // 更新缓存
+    
+    return true;
+}
+
+bool WebServer::registerVerify(const string& userName, const string& passwd) {
+    // 若用户名已经存在则直接返回false
+    if (userCache_.find(userName) != userCache_.end()) {
+        return false;
+    }
+
+    MYSQL* mysql = nullptr;
+    connectionRAII mysqlcon(&mysql, sqlConnPool_);
+    
+    char order[256] = {0};
+    snprintf(order, 256, "INSERT INTO user(username, passwd) VALUES('%s', '%s')", userName.c_str(), passwd.c_str());
+
+    if (mysql_query(mysql, order)) {
+        return false;
+    }
+    
+    updateUserCache(userName, passwd);   // 更新缓存
+    
+    return true;
+}
+
+void WebServer::updateUserCache(const string& userName, const string& passwd) {
+    lock_guard<mutex> locker(userCacheMtx_);
+    userCache_.emplace(userName, passwd);
+}
+
 // 监听事件
 bool WebServer::dealListenEvent() {
     struct sockaddr_in client_address;
@@ -73,31 +162,28 @@ bool WebServer::dealListenEvent() {
         LOG_ERROR("%s:errno is:%d", "accept error", errno);
         return false;
     }
-    if (http_conn::m_user_count >= maxHttpConns_) {
-        show_error(connfd, "Internal server busy");
+    if (HttpConnection::userCount >= maxHttpConns_) {
         LOG_ERROR("%s", "Internal server busy");
         return false;
     }
     
     // 初始化HTTP连接
-    users_[connfd].init(connfd, client_address, epoller_);
+    users_[connfd].init(client_address, connfd, 
+                    bind(&WebServer::loginVerify, this, placeholders::_1, placeholders::_2), 
+                    bind(&WebServer::registerVerify, this, placeholders::_1, placeholders::_2));
+    // 注册读事件
+    epoller_->addfd(connfd, HttpConnection::isEt, true, true);
 
-    printClientInfo(client_address, true);
-
-    //初始化client_data数据
-    //创建定时器，设置回调函数和超时时间，绑定用户数据，将定时器添加到链表中
+    // 初始化client_data数据
     usersData_[connfd].address = client_address;
     usersData_[connfd].sockfd = connfd;
 
+    // 创建定时器，设置回调函数和超时时间，绑定用户数据，将定时器添加到链表中
     util_timer *timer = new util_timer;
-    timer->user_data = &usersData_[connfd];
-    // timer->cb_func = cb_func;
     timer->update();
 
     usersData_[connfd].timer = timer;
-
-    // bind(&closeConnection_, this, &usersData_[connfd]) -> false
-    timers_->add_timer(timer, bind(&WebServer::closeConnection_, this, &usersData_[connfd]));
+    timers_->add_timer(timer, bind(&WebServer::closeConnection_, this, connfd));
 
     return true;
 }
@@ -106,79 +192,82 @@ bool WebServer::dealListenEvent() {
 bool WebServer::dealReadEvent(int sockfd) {
     util_timer *timer = usersData_[sockfd].timer;
 
-    // 将客户端请求读取到读缓存中
-    if (users_[sockfd].read_once()) {
-        LOG_INFO("deal with the client(%s)", inet_ntoa(users_[sockfd].get_address()->sin_addr));
-        Log::get_instance()->flush();
+    int readErrno = 0;
+    ssize_t len = users_[sockfd].httpRead(&readErrno);
 
-        // 若监测到读事件，将该事件放入请求队列
-        threadPool_->append(users_ + sockfd);
-
-        // 若有数据传输，则将定时器往后延迟3个单位
-        if (timer) {
-            timer->update();
-            LOG_INFO("%s", "adjust timer once");
-            Log::get_instance()->flush();
-
-            timers_->adjust_timer(timer);
-        }
-
-        return true;
+    // 若接收失败, 则关闭TCP连接 (=0说明对方断开连接)
+    if (len <= 0 && (readErrno != EAGAIN && readErrno != EWOULDBLOCK)) {
+        closeConnection(sockfd);
+        return false;
     }
 
-    // 若读取失败, 则调用定时器回调函数来关闭TCP连接
-    closeConnection(sockfd);
+    threadPool_->append(bind(&WebServer::process, this, sockfd));
 
-    return false;
+    if (timer) {
+        timer->update();
+        timers_->adjust_timer(timer);
+    }
+
+    return true;
 }
 
 // 写事件
 bool WebServer::dealWriteEvent(int sockfd) {
     util_timer *timer = usersData_[sockfd].timer;
 
-    // 发送数据
-    if (users_[sockfd].write()) {
-        LOG_INFO("send data to the client(%s)", inet_ntoa(users_[sockfd].get_address()->sin_addr));
-        Log::get_instance()->flush();
+    int writeErrno = 0;
+    ssize_t len = users_[sockfd].httpWrite(&writeErrno);
 
-        // 若有数据传输，则将定时器往后延迟3个单位
-        if (timer) {
-            timer->update();
-            LOG_INFO("%s", "adjust timer once");
-            Log::get_instance()->flush();
-
-            timers_->adjust_timer(timer);
-        }
-
-        return true;
+    // 若发送失败, 则关闭TCP连接
+    if (len < 0 && writeErrno != EAGAIN) {
+        users_[sockfd].unmap();
+        closeConnection(sockfd);
+        return false;
     }
 
-    // 若发送失败, 则调用定时器回调函数来关闭TCP连接
-    closeConnection(sockfd);
+    // 发送完毕
+    if (users_[sockfd].toWriteBytes() == 0) {
+        users_[sockfd].unmap();
+        epoller_->modfd(sockfd, EPOLLIN, HttpConnection::isEt, true);
+        // 判断是否是长连接
+        if (!users_[sockfd].isKeepAlive()) {
+            closeConnection(sockfd);
+            return false;
+        }
+        users_[sockfd].init();
+    }
+    // 继续传输
+    else if ((len < 0 && writeErrno == EAGAIN) || len > 0) {
+        epoller_->modfd(sockfd, EPOLLOUT, HttpConnection::isEt, true);
+    }
 
-    return false;
+    if (timer) {
+        timer->update();
+        timers_->adjust_timer(timer);
+    }
+
+    return true;
 }
 
 void WebServer::closeConnection(int sockfd) {
     // 将该通信描述符从epoll监听事件中移除, 并关闭通信描述符
-    // util_timer *timer = usersData_[sockfd].timer;
-    // timer->cb_func(&usersData_[sockfd]);
-
-    closeConnection_(&usersData_[sockfd]);
+    closeConnection_(sockfd);
 
     // 移除对应的定时器
     util_timer *timer = usersData_[sockfd].timer;
     if (timer) timers_->del_timer(timer);
 }
 
-void WebServer::closeConnection_(client_data *user_data) {
-    epoller_->removefd(user_data->sockfd);
-    assert(user_data);
-    close(user_data->sockfd);
-    http_conn::m_user_count--;
+void WebServer::closeConnection_(int sockfd) {
+    epoller_->removefd(sockfd);
+    users_[sockfd].closeConnection();
+}
 
-    LOG_INFO("close fd %d", user_data->sockfd);
-    Log::get_instance()->flush();
+void WebServer::process(int sockfd) {
+    if (users_[sockfd].httpProcess())
+        epoller_->modfd(sockfd, EPOLLOUT, HttpConnection::isEt, true);
+    else
+        epoller_->modfd(sockfd, EPOLLIN, HttpConnection::isEt, true);
 }
 
 // Webserver核心逻辑
@@ -199,27 +288,22 @@ void WebServer::start() {
         for (int i = 0; i < eventsNum; i++) {
             uint32_t trigerEvent = epoller_->getEvent(i);
             int sockfd = epoller_->getEventfd(i);
-
             // 监听事件
             if (sockfd == listenfd_) {
                 dealListenEvent();
             }
-
             // 错误事件
             else if (trigerEvent & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
                 closeConnection(sockfd);
             }
-
             // 读事件
             else if (trigerEvent & EPOLLIN) {
                 dealReadEvent(sockfd);
             }
-
             // 写事件
             else if (trigerEvent & EPOLLOUT) {
                 dealWriteEvent(sockfd);
             }
-
             // 其它事件
             else {
                 LOG_ERROR("Unexpected event");

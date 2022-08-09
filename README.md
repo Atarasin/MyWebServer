@@ -6,9 +6,10 @@
 
 - 利用多线程和epoll技术**模拟Proactor模式**，实现服务器高性能并发模型；
 - 使用**有限状态机**高效**解析HTTP请求报文**，支持GET和POST请求；
-- 实现了**线程池**，并通过设置**监控线程**，可以及时重启运行不正常的线程；
+- 基于function设计了**线程池模板类**，可以通过添加不同的请求而执行不同的任务函数；
 - **基于小顶堆**实现了定时器，可以及时关闭不活跃的TCP连接；
 - 实现**同步/异步日志系统**，记录服务器运行状态。
+- 基于vector设计了**可自动增长的缓存区**，可以适应不同大小的报文数据
 
 ## 测试环境
 
@@ -37,23 +38,24 @@
    INSERT INTO user(username, passwd) VALUES('name', 'passwd');
    ```
 
-2. 修改`test.cpp`中的服务器的端口号、数据库连接参数(包括MySQL服务器的用户名、登录密码以及数据库名)。
+2. 修改`main.cpp`中的服务器的端口号、数据库连接参数(包括MySQL服务器的用户名、登录密码以及数据库名)。
 
    ```c++
    WebServer server(
         10000,              // 端口号
         5000,               // 执行一次tick的时间
         false,              // 日志模型
+        false,              // listenFd ET mode
         "username",         // MySQL用户名
         "passward",         // MySQL登录密码
         "dbname"            // MySQL使用的数据库
     );
    ```
 
-3. 修改`http_conn.cpp`中的服务器资源路径。
+3. 修改`http_connection.cpp`中的服务器资源路径。
 
    ```c++
-   const char* doc_root = ".../MyWebServer/resources";
+   string HttpConnection::rootPath = ".../MyWebServer/resources/";
    ```
 
 修改之后进行编译、运行。
@@ -67,5 +69,6 @@ make
 ## 致谢
 
 - Linux高性能服务器编程
+- Linux多线程服务端编程：使用muduo C++网络库
 - [@qinguoyi](https://github.com/qinguoyi/TinyWebServer)
 - [@markparticle](https://github.com/markparticle/WebServer)

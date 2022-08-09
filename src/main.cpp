@@ -11,18 +11,18 @@
 
 #include "../include/locker.h"
 #include "../include/timer_minheap.h"
-#include "../include/http_conn.h"
+#include "../include/http_connection.h"
 #include "../include/log.h"
 #include "../include/sql_connection_pool.h"
 #include "../include/threadpool.h"
 #include "../include/webserver.h"
-#include "../include/public.h"
 
 int main () {
     WebServer server(
         10000,          // 端口号
         5000,           // 执行一次tick的时间
         false,          // 日志模型
+        false,          // listenFd ET mode
         "root",         // MySQL用户名
         "root",         // MySQL登录密码
         "webserver"     // MySQL使用的数据库

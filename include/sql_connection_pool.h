@@ -17,7 +17,7 @@ using namespace std;
 class connection_pool {
 public:
 	MYSQL *GetConnection();				 //获取数据库连接
-	bool ReleaseConnection(MYSQL *conn); //释放连接
+	bool ReleaseConnection(MYSQL *sql); //释放连接
 	int GetFreeConn();					 //获取连接
 	void DestroyPool();					 //销毁所有连接
 
@@ -37,7 +37,7 @@ private:
 
 private:
 	locker lock;
-	list<MYSQL *> connList; //连接池
+	list<MYSQL*> connList; //连接池
 	sem reserve;
 
 private:
@@ -51,12 +51,13 @@ private:
 class connectionRAII{
 
 public:
-	connectionRAII(MYSQL **con, connection_pool *connPool);
+    // sql是一个传出参数, 为的是可以改变指针的值
+	connectionRAII(MYSQL **sql, connection_pool *connPool);
 	~connectionRAII();
 	
 private:
-	MYSQL *conRAII;
-	connection_pool *poolRAII;
+	MYSQL *sqlRAII;                     // 数据库连接池的一个连接
+	connection_pool *poolRAII;          // 数据库连接池
 };
 
 #endif

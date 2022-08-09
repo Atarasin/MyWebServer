@@ -2,9 +2,12 @@
 #define _EPOLLER_H
 
 #include <sys/epoll.h>
+#include <unistd.h>
+#include <assert.h>
+#include <fcntl.h>
 #include <vector>
 
-#include "public.h"
+using namespace std;
 
 class Epoller {
 public:
@@ -15,9 +18,10 @@ public:
     uint32_t getEvent(int index);
     int getEventfd(int index);
 
-    void addfd(int fd, bool one_shot);          // 将内核事件表注册读事件，ET模式，选择开启EPOLLONESHOT
-    void removefd(int fd);                      // 从内核时间表删除描述符
-    void modfd(int fd, int ev);                 // 将事件重置为EPOLLONESHOT
+    void addfd(int fd, bool isET, bool oneshot, bool nonblock);    
+    void removefd(int fd);
+    void modfd(int fd, uint32_t ev, bool isET, bool oneshot);          
+    int setNonBlocking(int fd);              
 
 private:
     int epollfd_;           

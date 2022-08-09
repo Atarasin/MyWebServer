@@ -13,31 +13,17 @@ int Epoller::wait(int timeout) {
 }
 
 // 将内核事件表注册读事件，ET模式，选择开启EPOLLONESHOT
-void Epoller::addfd(int fd, bool one_shot) {
+void Epoller::addfd(int fd, bool isET, bool oneshot, bool nonblock) {
     epoll_event event;
     event.data.fd = fd;
-
-#ifdef connfdET
-    event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-#endif
-
-#ifdef connfdLT
     event.events = EPOLLIN | EPOLLRDHUP;
-#endif
 
-#ifdef listenfdET
-    event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
-#endif
-
-#ifdef listenfdLT
-    event.events = EPOLLIN | EPOLLRDHUP;
-#endif
-
-    if (one_shot)
-        event.events |= EPOLLONESHOT;
+    if (isET) event.events |= EPOLLET;
+    if (oneshot) event.events |= EPOLLONESHOT;
 
     epoll_ctl(epollfd_, EPOLL_CTL_ADD, fd, &event);
-    setnonblocking(fd);
+
+    if (nonblock) setNonBlocking(fd);
 }
 
 void Epoller::removefd(int fd) {
@@ -45,19 +31,21 @@ void Epoller::removefd(int fd) {
     close(fd);
 }
 
-void Epoller::modfd(int fd, int ev) {
+void Epoller::modfd(int fd, uint32_t ev, bool isET, bool oneshot) {
     epoll_event event;
     event.data.fd = fd;
 
-#ifdef connfdET
-    event.events = ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
-#endif
+    event.events = ev | EPOLLRDHUP; 
 
-#ifdef connfdLT
-    event.events = ev | EPOLLONESHOT | EPOLLRDHUP;
-#endif
+    if (isET) event.events |= EPOLLET;
+    if (oneshot) event.events |= EPOLLONESHOT;
 
     epoll_ctl(epollfd_, EPOLL_CTL_MOD, fd, &event);
+}
+
+int Epoller::setNonBlocking(int fd) {
+    assert(fd > 0);
+    return fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
 }
 
 uint32_t Epoller::getEvent(int index) {

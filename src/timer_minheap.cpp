@@ -41,7 +41,7 @@ void TimerMinHeap::siftdown(int index) {
 }
 
 // 添加新的定时器
-void TimerMinHeap::add_timer(util_timer* timer, const timeoutCBFunct& cb) {
+void TimerMinHeap::add_timer(util_timer* timer, timeoutCBFunct cb) {
     if (timer == nullptr)
         return;
 
@@ -74,8 +74,6 @@ void TimerMinHeap::del_timer(util_timer* timer) {
     timerToIdx.erase(timerToIdx.find(timer));
     minheap.pop_back();
 
-    printClientInfo(timer->user_data->address, false);
-
     delete timer;
 
     // 调整被交换的定时器
@@ -87,14 +85,10 @@ void TimerMinHeap::tick() {
     if (minheap.empty()) 
         return;
 
-    LOG_INFO("%s", "timer tick");
-    Log::get_instance()->flush();
-
     time_t curtime = time(NULL);
 
     while (!minheap.empty() && minheap.front()->expire < curtime) {
         // 释放当前连接
-        // minheap.front()->cb_func(minheap.front()->user_data);
         minheap.front()->cbFunc();
         del_timer(minheap.front());
     }

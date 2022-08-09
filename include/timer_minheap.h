@@ -5,8 +5,11 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
+#include <assert.h>
+#include <sys/epoll.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "log.h"
-#include "public.h"
 
 using namespace std;
 
@@ -24,9 +27,8 @@ struct client_data {
 class util_timer {
 public:
     time_t expire;                      // 定时器释放时间, 可以释放不活跃的TCP连接
-    // void (*cb_func)(client_data *);     // 定时器回调函数
-    timeoutCBFunct cbFunc;
-    client_data *user_data;
+    timeoutCBFunct cbFunc;              // 超时回调
+    // client_data *user_data;
 
     void update(int timeslot = 5) {
         time_t cur = time(NULL);
@@ -53,7 +55,8 @@ public:
     ~TimerMinHeap() {}
 
     // 在数组末端添加定时器节点, 然后往上调整
-    void add_timer(util_timer* timer, const timeoutCBFunct& cb);    // 为什么要加const
+    // void add_timer(util_timer* timer, const timeoutCBFunct& cb);    // 为什么要加const？
+    void add_timer(util_timer* timer, timeoutCBFunct cb);
 
     // expire只会增加, 故应该向下调整
     void adjust_timer(util_timer* timer);

@@ -131,13 +131,13 @@ connection_pool::~connection_pool()
 	DestroyPool();
 }
 
-connectionRAII::connectionRAII(MYSQL **SQL, connection_pool *connPool) {
-	*SQL = connPool->GetConnection();
+connectionRAII::connectionRAII(MYSQL **sql, connection_pool *connPool) {
+	*sql = connPool->GetConnection();
 	
-	conRAII = *SQL;
+	sqlRAII = *sql;
 	poolRAII = connPool;
 }
 
 connectionRAII::~connectionRAII() {
-	poolRAII->ReleaseConnection(conRAII);
+	poolRAII->ReleaseConnection(sqlRAII);
 }
