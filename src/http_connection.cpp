@@ -56,15 +56,15 @@ void HttpConnection::printClientInfo(bool isConnect) {
 
     if (isConnect) {
         LOG_INFO("A TCP connection is established: ip - %s, port - %d", clientIP, clientPort);
-        Log::get_instance()->flush();
+        Log::getInstance()->flush();
     }
     else {
         LOG_INFO("A TCP connection is destoried: ip - %s, port - %d", clientIP, clientPort);
-        Log::get_instance()->flush();
+        Log::getInstance()->flush();
     }
 
     LOG_INFO("Current TCP connection num: %d", userCount);
-    Log::get_instance()->flush();
+    Log::getInstance()->flush();
 }
 
 // TCP -> readBuffer_

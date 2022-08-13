@@ -24,9 +24,9 @@ WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sq
 
     // 初始化日志
     if (isAsynLog)
-        Log::get_instance()->init("ServerLog", 2000, 800000, 8);  // 异步日志模型
+        Log::getInstance()->init("ServerLog", 2000, 800000, 8);  // 异步日志模型
     else
-        Log::get_instance()->init("ServerLog", 2000, 800000, 0);  // 同步日志模型
+        Log::getInstance()->init("ServerLog", 2000, 800000, 0);  // 同步日志模型
 }
 
 WebServer::~WebServer() {
