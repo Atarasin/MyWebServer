@@ -1,207 +1,99 @@
-/*************************************************************
-*循环数组实现的阻塞队列，m_back = (m_back + 1) % m_max_size;  
-*线程安全，每个操作前都要先加互斥锁，操作完后，再解锁
-**************************************************************/
-
 #ifndef _BLOCK_QUEUE_H
 #define _BLOCK_QUEUE_H
 
 #include <iostream>
-#include <stdlib.h>
-#include <pthread.h>
-#include <sys/time.h>
-#include "locker.h"
+#include <mutex>
+#include <condition_variable>
+#include <vector>
 
 using namespace std;
 
 template <class T>
-class block_queue {
+class BlockQueue {
 public:
-    block_queue(int max_size = 1000)
-    {
-        if (max_size <= 0)
-        {
-            exit(-1);
-        }
+    BlockQueue(int maxSize = INITITAL_QUEUE_CAPACITY_) {
+        if (maxSize <= 0) maxSize = INITITAL_QUEUE_CAPACITY_;
+        nums_.assign(maxSize + 1, T());
 
-        m_max_size = max_size;
-        m_array = new T[max_size];
-        m_size = 0;
-        m_front = -1;
-        m_back = -1;
+        capacity_ = maxSize + 1;
+        front_ = 0;
+        rear_ = 0;
     }
 
-    void clear()
-    {
-        m_mutex.lock();
-        m_size = 0;
-        m_front = -1;
-        m_back = -1;
-        m_mutex.unlock();
+    ~BlockQueue() {}
+
+    void clear() {
+        lock_guard<mutex> locker(mtx_);
+        nums_.clear();
+        front_ = 0;
+        rear_ = 0;
     }
 
-    ~block_queue()
-    {
-        m_mutex.lock();
-        if (m_array != NULL)
-            delete [] m_array;
+    bool front(T& value) {
+        lock_guard<mutex> locker(mtx_);
 
-        m_mutex.unlock();
-    }
-    //判断队列是否满了
-    bool full() 
-    {
-        m_mutex.lock();
-        if (m_size >= m_max_size)
-        {
+        if (empty()) return false;
 
-            m_mutex.unlock();
-            return true;
-        }
-        m_mutex.unlock();
-        return false;
-    }
-    //判断队列是否为空
-    bool empty() 
-    {
-        m_mutex.lock();
-        if (0 == m_size)
-        {
-            m_mutex.unlock();
-            return true;
-        }
-        m_mutex.unlock();
-        return false;
-    }
-    //返回队首元素
-    bool front(T &value) 
-    {
-        m_mutex.lock();
-        if (0 == m_size)
-        {
-            m_mutex.unlock();
-            return false;
-        }
-        value = m_array[m_front];
-        m_mutex.unlock();
-        return true;
-    }
-    //返回队尾元素
-    bool back(T &value) 
-    {
-        m_mutex.lock();
-        if (0 == m_size)
-        {
-            m_mutex.unlock();
-            return false;
-        }
-        value = m_array[m_back];
-        m_mutex.unlock();
+        value = nums_[front_];
         return true;
     }
 
-    int size() 
-    {
-        int tmp = 0;
+    bool back(T& value) {
+        lock_guard<mutex> locker(mtx_);
 
-        m_mutex.lock();
-        tmp = m_size;
+        if (empty()) return false;
 
-        m_mutex.unlock();
-        return tmp;
-    }
-
-    int max_size()
-    {
-        int tmp = 0;
-
-        m_mutex.lock();
-        tmp = m_max_size;
-
-        m_mutex.unlock();
-        return tmp;
-    }
-    // 往队列添加元素，需要将所有使用队列的线程先唤醒
-    // 当有元素push进队列,相当于生产者生产了一个元素
-    // 若当前没有线程等待条件变量,则唤醒无意义
-    bool push(const T &item) {
-
-        m_mutex.lock();
-        if (m_size >= m_max_size) {
-
-            m_cond.broadcast();
-            m_mutex.unlock();
-            return false;
-        }
-
-        m_back = (m_back + 1) % m_max_size;
-        m_array[m_back] = item;
-
-        m_size++;
-
-        m_cond.broadcast();
-        m_mutex.unlock();
-        return true;
-    }
-    // pop时,如果当前队列没有元素,将会等待条件变量
-    bool pop(T &item) {
-
-        m_mutex.lock();
-        while (m_size <= 0) {
-            // 返回0才是true, 即调用失败才会进行if语句
-            if (!m_cond.wait(m_mutex.get())) {
-                m_mutex.unlock();
-                return false;
-            }
-        }
-
-        m_front = (m_front + 1) % m_max_size;
-        item = m_array[m_front];
-        m_size--;
-        m_mutex.unlock();
+        value = nums_[(rear_ - 1 + capacity_) % capacity_];
         return true;
     }
 
-    //增加了超时处理
-    bool pop(T &item, int ms_timeout)
-    {
-        struct timespec t = {0, 0};
-        struct timeval now = {0, 0};
-        gettimeofday(&now, NULL);
-        m_mutex.lock();
-        if (m_size <= 0)
-        {
-            t.tv_sec = now.tv_sec + ms_timeout / 1000;
-            t.tv_nsec = (ms_timeout % 1000) * 1000;
-            if (!m_cond.timewait(m_mutex.get(), t))
-            {
-                m_mutex.unlock();
-                return false;
-            }
-        }
+    // producer
+    bool push(const T& item) {
+        unique_lock<mutex> locker(mtx_);
 
-        if (m_size <= 0)
-        {
-            m_mutex.unlock();
+        if (full()) {
+            cond_.notify_all();
             return false;
         }
 
-        m_front = (m_front + 1) % m_max_size;
-        item = m_array[m_front];
-        m_size--;
-        m_mutex.unlock();
+        nums_[rear_] = item;
+        rear_ = (rear_ + 1) % capacity_;
+        cond_.notify_all();
+        return true;
+    }
+
+    // customer
+    bool pop(T& item) {
+        unique_lock<mutex> locker(mtx_);
+
+        while (empty()) {
+            cond_.wait(locker);
+        }
+
+        item = nums_[front_];
+        front_ = (front_ + 1) % capacity_;
         return true;
     }
 
 private:
-    locker m_mutex;
-    cond m_cond;
+    bool full() {
+        return front_ == (rear_ + 1) % capacity_ ? true : false;
+    }
 
-    T *m_array;
-    int m_size;
-    int m_max_size;
-    int m_front;
-    int m_back;
+    bool empty() {
+        return front_ == rear_ ? true : false;
+    }
+
+private:
+    vector<T> nums_;
+    int capacity_;
+    int front_;
+    int rear_;
+
+    mutex mtx_;
+    condition_variable cond_;
+
+    static constexpr int INITITAL_QUEUE_CAPACITY_ = 1000;
 };
 
 #endif
