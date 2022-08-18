@@ -2,17 +2,17 @@
 #define _LOG_H
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <iostream>
 #include <string>
-#include <stdarg.h>
-#include <string.h>
-#include <time.h>
-#include <sys/time.h>
-#include <stdarg.h>
 #include <mutex>
 #include <thread>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
 
 #include "block_queue.h"
+#include "buffer.h"
 
 using namespace std;
 
@@ -30,8 +30,8 @@ public:
         Log::getInstance()->asyncWriteLog();
     }
 
-    // 可选择的参数有日志文件、日志缓冲区大小、最大行数以及最长日志条队列
-    bool init(const char *file_name, int log_buf_size = 8192, int split_lines = 5000000, int max_queue_size = 0);
+    // 可选择的参数有日志文件、最大行数以及最长日志条队列
+    bool init(const string& logName, int splitLines = 50000, int maxQueueSize = 0);
 
     // 将输出内容按照标准格式整理
     void writeLog(int level, const char *format, ...);     // producer
@@ -41,37 +41,38 @@ public:
 
 private:
     Log() {
-        m_count = 0;
-        m_is_async = false;
+        lineCounts_ = 0;
+        isAsync_ = false;
     }
 
     virtual ~Log() {
-        if (m_fp != NULL) fclose(m_fp);
+        if (fp_ != NULL) fclose(fp_);
     }
 
     // 异步写日志方法
     void *asyncWriteLog() {
-        string single_log;
+        string logStr;
         // 从阻塞队列中取出一个日志string，写入文件
-        while (m_log_queue->pop(single_log)) {
+        while (logQueue_->pop(logStr)) {
             {
                 lock_guard<mutex> locker(mtx_);
-                fputs(single_log.c_str(), m_fp);
+                fputs(logStr.c_str(), fp_);
             }
         }
     }
 
 private:
-    char dir_name[128];                     // 路径名
-    char log_name[128];                     // log文件名
-    int m_split_lines;                      // 日志最大行数
-    int m_log_buf_size;                     // 日志缓冲区大小
-    long long m_count;                      // 日志行数记录
-    int m_today;                            // 因为按天分类, 记录当前时间是那一天
-    FILE *m_fp;                             // 打开log的文件指针
-    char *m_buf;
-    BlockQueue<string> *m_log_queue;       // 阻塞队列
-    bool m_is_async;                        // 是否同步标志位
+    string logPath_;                        // 日志路径
+    string logName_;                        // 日志文件名
+    string logFile_;                        // 完整路径
+
+    int maxSplitLines_;                     // 日志最大行数
+    long long lineCounts_;                  // 日志行数记录
+    int today_;                             // 因为按天分类, 记录当前时间是那一天
+    FILE *fp_;                              // 打开log的文件指针
+
+    BlockQueue<string> *logQueue_;           // 阻塞队列
+    bool isAsync_;                           // 是否同步标志位
     mutex mtx_;
 };
 

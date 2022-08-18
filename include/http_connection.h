@@ -25,8 +25,8 @@
 typedef function<bool(const string&, const string&)> sqlCallback;
 
 struct ClientInfo {
-    struct sockaddr_in address;            // 客户端地址和端口信息
-    int sockfd;                     // TCP通信的文件描述符
+    struct sockaddr_in address;             // 客户端地址和端口信息
+    int sockfd;                             // TCP通信的文件描述符
 };
 
 struct HttpInfo {
@@ -125,7 +125,7 @@ private:
 
     const char* lineEnd_;                   // 一行的结束位置
     CHECK_STATE mainState_;                 
-    HttpInfo httpInfo_;           
+    HttpInfo httpInfo_;                     // 解析得到的结果
     string requestPath_;                    // 请求资源的路径    
     struct stat reqFileState_;              // 请求资源的状态
     char* reqFileAddr_;                     // 客户请求的文件被映射到内存的起始位置

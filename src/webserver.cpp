@@ -24,9 +24,9 @@ WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sq
 
     // 初始化日志
     if (isAsynLog)
-        Log::getInstance()->init("ServerLog", 2000, 800000, 8);  // 异步日志模型
+        Log::getInstance()->init("ServerLog", 800000, 8);  // 异步日志模型
     else
-        Log::getInstance()->init("ServerLog", 2000, 800000, 0);  // 同步日志模型
+        Log::getInstance()->init("ServerLog", 800000, 0);  // 同步日志模型
 }
 
 WebServer::~WebServer() {
@@ -86,8 +86,8 @@ void WebServer::initUserCache() {
         userCache_[string(row[0])] = string(row[1]);
     }
 
-    // for (auto it = userCache_.begin(); it != userCache_.end(); ++it)
-    //     cout << "user: " << it->first << ", " << "passwd: " << it->second << endl;
+    for (auto it = userCache_.begin(); it != userCache_.end(); ++it)
+        cout << "user: " << it->first << ", " << "passwd: " << it->second << endl;
 }
 
 bool WebServer::loginVerify(const string& userName, const string& passwd) {

@@ -58,6 +58,12 @@
    string HttpConnection::rootPath = ".../MyWebServer/resources/";
    ```
 
+4. 修改`log.cpp`中的默认日志存放路径。
+
+   ```c++
+   static const char* logRootPath = ".../MyWebServer/logs";;
+   ```
+
 修改之后进行编译、运行。
 
 ```shell
