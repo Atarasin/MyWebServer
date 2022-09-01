@@ -67,7 +67,8 @@
 修改之后进行编译、运行。
 
 ```shell
-cd src
+mkdir build && cd build
+cmake ..
 make
 ./server
 ```

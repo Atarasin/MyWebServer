@@ -18,7 +18,6 @@ using namespace std;
 
 class Log {
 public:
-    // C++11以后,使用局部变量懒汉不用加锁
     static Log *getInstance() {
         static Log instance;
         return &instance;
