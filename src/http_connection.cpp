@@ -282,7 +282,8 @@ HttpConnection::HTTP_CODE HttpConnection::doRequest() {
         string name = httpInfo_.requestBody.substr(5, pos - 5);
         string passwd = httpInfo_.requestBody.substr(pos + 8);
 
-        // cout << "name-" << name << "," << "passwd-" << passwd << "." << endl;
+        // cout << "body: " << httpInfo_.requestBody << endl;
+        // cout << "name:" << name << "," << "passwd:" << passwd << endl;
 
         // 注册
         if (httpInfo_.url[0] == '3') {

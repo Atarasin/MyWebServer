@@ -91,10 +91,14 @@ void WebServer::initUserCache() {
 }
 
 bool WebServer::loginVerify(const string& userName, const string& passwd) {
+    cout << "user: " << userName << ", " << "passwd: " << passwd << endl;
     // 先查看userCache中是否存在
     if (userCache_.find(userName) != userCache_.end()) {
+        cout << "in cache" << endl;
         return userCache_[userName] == passwd ? true : false;
     }
+
+    cout << "in mysql server" << endl;
 
     // 若不存在, 则查询数据库
     MYSQL* mysql = nullptr;
@@ -115,8 +119,9 @@ bool WebServer::loginVerify(const string& userName, const string& passwd) {
     fields = mysql_fetch_fields(res);
 
     MYSQL_ROW row = mysql_fetch_row(res);
-    printf("MYSQL ROW: %s %s", row[0], row[1]);
-    if (passwd != string(row[1]))
+    
+    // 用户名不存在或用户名对应的密码错误
+    if (row == NULL || passwd != string(row[1]))
         return false;
     
     mysql_free_result(res);
