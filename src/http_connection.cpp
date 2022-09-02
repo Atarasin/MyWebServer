@@ -282,8 +282,8 @@ HttpConnection::HTTP_CODE HttpConnection::doRequest() {
         string name = httpInfo_.requestBody.substr(5, pos - 5);
         string passwd = httpInfo_.requestBody.substr(pos + 8);
 
-        // cout << "body: " << httpInfo_.requestBody << endl;
-        // cout << "name:" << name << "," << "passwd:" << passwd << endl;
+        DEBUG_INFO(cout << "body: " << httpInfo_.requestBody << endl);
+        DEBUG_INFO(cout << "name:" << name << "," << "passwd:" << passwd << endl);
 
         // 注册
         if (httpInfo_.url[0] == '3') {
@@ -312,8 +312,6 @@ HttpConnection::HTTP_CODE HttpConnection::doRequest() {
         requestPath_ += "other.html";
 
     else requestPath_ += httpInfo_.url;
-
-    // cout << "Path:" << requestPath_.c_str() << endl;
 
     // 获得客户端请求资源文件的权限
     if (stat(requestPath_.c_str(), &reqFileState_) < 0) {

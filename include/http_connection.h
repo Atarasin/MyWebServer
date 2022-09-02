@@ -22,6 +22,12 @@
 #include "sql_connection_pool.h"
 #include "log.h"
 
+#ifdef DEBUG_MODE
+#define DEBUG_INFO(x) x
+#else
+#define DEBUG_INFO(x)
+#endif
+
 typedef function<bool(const string&, const string&)> sqlCallback;
 
 struct ClientInfo {

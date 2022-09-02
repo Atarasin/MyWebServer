@@ -24,9 +24,9 @@ WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sq
 
     // 初始化日志
     if (isAsynLog)
-        Log::getInstance()->init("ServerLog", 800000, 8);  // 异步日志模型
+        Log::getInstance()->init("ServerLog", 80000, 8);  // 异步日志模型
     else
-        Log::getInstance()->init("ServerLog", 800000, 0);  // 同步日志模型
+        Log::getInstance()->init("ServerLog", 80000, 0);  // 同步日志模型
 }
 
 WebServer::~WebServer() {
@@ -87,18 +87,17 @@ void WebServer::initUserCache() {
     }
 
     for (auto it = userCache_.begin(); it != userCache_.end(); ++it)
-        cout << "user: " << it->first << ", " << "passwd: " << it->second << endl;
+        DEBUG_INFO(cout << "user: " << it->first << ", " << "passwd: " << it->second << endl);
 }
 
 bool WebServer::loginVerify(const string& userName, const string& passwd) {
-    cout << "user: " << userName << ", " << "passwd: " << passwd << endl;
     // 先查看userCache中是否存在
     if (userCache_.find(userName) != userCache_.end()) {
-        cout << "in cache" << endl;
+        DEBUG_INFO(cout << "in cache" << endl);
         return userCache_[userName] == passwd ? true : false;
     }
 
-    cout << "in mysql server" << endl;
+    DEBUG_INFO(cout << "in mysql server" << endl);
 
     // 若不存在, 则查询数据库
     MYSQL* mysql = nullptr;

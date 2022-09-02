@@ -27,6 +27,9 @@ int main () {
         "root",         // MySQL登录密码
         "webserver"     // MySQL使用的数据库
     );
+    DEBUG_INFO(cout << "=====================================" << endl);
+    DEBUG_INFO(cout << "webserver starts." << endl);
+    DEBUG_INFO(cout << "=====================================" << endl);
     server.start();
 
     return 0;
