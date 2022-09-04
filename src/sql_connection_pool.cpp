@@ -43,6 +43,10 @@ void connection_pool::init(string url, string User, string PassWord, string DBNa
 			cout << "Error: " << mysql_error(con);
 			exit(1);
 		}
+
+        // 设置mysql字符集 (避免查询数据在网页上显示时出现乱码)
+        mysql_set_character_set(con, "utf8");
+
         // 将mysql数据库连接全部放入到双向链表中
 		connList.push_back(con);
 		++FreeConn;

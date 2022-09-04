@@ -39,6 +39,7 @@ private:
     bool loginVerify(const string& userName, const string& passwd);
     bool registerVerify(const string& userName, const string& passwd);
     void updateUserCache(const string& userName, const string& passwd);
+    bool sqlQuery(const char* sqlOrder, string& sqlResult);
 
     // epoll事件处理函数
     bool dealListenEvent();

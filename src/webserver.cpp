@@ -151,6 +151,54 @@ bool WebServer::registerVerify(const string& userName, const string& passwd) {
     return true;
 }
 
+bool WebServer::sqlQuery(const char* sqlOrder, string& sqlResult) {
+    // 先尝试从缓存中取数据
+    if (false) {
+
+    }
+
+    MYSQL* mysql = nullptr;
+    connectionRAII mysqlcon(&mysql, sqlConnPool_);
+
+    MYSQL_FIELD* fields = nullptr;
+    MYSQL_RES* res = nullptr;
+    unsigned int num_fields;
+
+    if (mysql_query(mysql, sqlOrder)) {
+        mysql_free_result(res);
+        return false;
+    }
+
+    res = mysql_store_result(mysql);
+    fields = mysql_fetch_fields(res);
+    num_fields = mysql_num_fields(res);
+
+    for (int i = 0; i < num_fields; ++i) {
+        sqlResult += fields[i].name;
+        sqlResult.push_back(',');
+    }
+    sqlResult.pop_back();
+    sqlResult += "<br/>\n";
+
+    MYSQL_ROW row;
+    while ((row = mysql_fetch_row(res))) {
+        unsigned long* lengths;
+        lengths = mysql_fetch_lengths(res);
+        for (int i = 0; i < num_fields; ++i) {
+            sqlResult += (row[i] ? row[i] : "NULL");
+            sqlResult.push_back(',');
+            DEBUG_INFO(cout << "row " << i << ": " << (int)lengths[i] << ", " << (row[i] ? row[i] : "NULL") << " ");
+        }
+        sqlResult.pop_back();
+        sqlResult += "<br/>\n";
+        DEBUG_INFO(cout << endl);
+    }
+    
+    mysql_free_result(res);
+    
+    return true;
+}
+
 void WebServer::updateUserCache(const string& userName, const string& passwd) {
     lock_guard<mutex> locker(userCacheMtx_);
     userCache_.emplace(userName, passwd);
@@ -174,7 +222,8 @@ bool WebServer::dealListenEvent() {
     // 初始化HTTP连接
     users_[connfd].init(client_address, connfd, 
                     bind(&WebServer::loginVerify, this, placeholders::_1, placeholders::_2), 
-                    bind(&WebServer::registerVerify, this, placeholders::_1, placeholders::_2));
+                    bind(&WebServer::registerVerify, this, placeholders::_1, placeholders::_2),
+                    bind(&WebServer::sqlQuery, this, placeholders::_1, placeholders::_2));
     // 注册读事件
     epoller_->addfd(connfd, HttpConnection::isEt, true, true);
 

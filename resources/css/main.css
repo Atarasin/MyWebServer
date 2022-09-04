@@ -42,3 +42,10 @@ html,body{height:100%}
 .picture_submit{width:100%;height:100px;left:0;top:180px;font-size:30px;border:0px;font-family:'Microsoft Yahei';cursor:pointer;}
 .video_submit{width:100%;height:100px;left:0;top:180px;font-size:30px;border:0px;font-family:'Microsoft Yahei';cursor:pointer;}
 .other_submit{width:100%;height:100px;left:0;top:180px;font-size:30px;border:0px;font-family:'Microsoft Yahei';cursor:pointer;}
+
+/* 数据库查询页 */
+.sql_input{width:308px;height:250px;margin:20px auto;position:relative;}
+.database_input,.table_input{width:306px;height:36px;border:1px solid #e0e0e0;outline:none;font-size:14px;text-indent:10px;position: absolute;left:0;top:0}
+.table_input{top:65px;background-position:280px -95px;}
+
+.sql_submit{width:100%;height:40px;position:absolute;left:0;top:180px;background-color:#47aa34;color:#fff;font-size:22px;border:0px;font-family:'Microsoft Yahei';cursor:pointer;}

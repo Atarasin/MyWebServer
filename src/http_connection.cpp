@@ -17,11 +17,12 @@ int HttpConnection::userCount = 0;
 regex HttpConnection::rqLineRule = regex("^([^ ]*) ([^ ]*) HTTP/([^ ]*)$");
 regex HttpConnection::rqHeaderRule = regex("^([^:]*): ?(.*)$");
 
-void HttpConnection::init(sockaddr_in& address, int sockfd, sqlCallback loginCb, sqlCallback registerCb) {
+void HttpConnection::init(sockaddr_in& address, int sockfd, sqlCallback loginCb, sqlCallback registerCb, sqlQueryCallback sqlQueryCb) {
     clientInfo_.address = address;
     clientInfo_.sockfd = sockfd;
     loginCb_ = loginCb;
     registerCb_ = registerCb;
+    sqlQueryCb_ = sqlQueryCb;
     userCount++;
     init();
 
@@ -38,6 +39,7 @@ void HttpConnection::init() {
     readBuffer_.reset();
     writeBuffer_.reset();
 
+    mmpUsed = false;
     mainState_ = CHECK_STATE_REQUESTLINE;
 }
 
@@ -224,6 +226,8 @@ HttpConnection::HTTP_CODE HttpConnection::parseRequestLine(const string& text) {
     if (httpInfo_.url.empty())
         httpInfo_.url += "login.html";
 
+    DEBUG_INFO(cout << "httpInfo_.url: " << httpInfo_.url << endl);
+
     mainState_ = CHECK_STATE_HEADER;
     return NO_REQUEST;
 }
@@ -287,19 +291,48 @@ HttpConnection::HTTP_CODE HttpConnection::doRequest() {
 
         // 注册
         if (httpInfo_.url[0] == '3') {
-            if (registerCb_(name, passwd))
-                httpInfo_.url = "login.html";
-            else
-                httpInfo_.url = "registerError.html";
+            if (registerCb_(name, passwd)) httpInfo_.url = "login.html";
+            else httpInfo_.url = "registerError.html";
         }
 
         // 登录
         else if (httpInfo_.url[0] == '2') {
-            if (loginCb_(name, passwd))
-                httpInfo_.url = "welcome.html";
-            else
-                httpInfo_.url = "loginError.html";
+            if (loginCb_(name, passwd)) httpInfo_.url = "welcome.html";
+            else httpInfo_.url = "loginError.html";
         }
+    }
+
+    // 访问数据库并将访问结果写入到内存中
+    if (httpInfo_.method == "POST" && httpInfo_.url == "sql_query") {
+        // database=mydatabase&table=orders
+        string::size_type pos = httpInfo_.requestBody.find("&");
+        string dbName = httpInfo_.requestBody.substr(9, pos - 9);
+        string tbName = httpInfo_.requestBody.substr(pos + 7);
+
+        DEBUG_INFO(cout << "body: " << httpInfo_.requestBody << endl);
+        DEBUG_INFO(cout << "database: " << dbName << "," << "table:" << tbName << endl);
+
+        char order[256] = {0};
+        snprintf(order, 256, "SELECT * FROM %s.%s", dbName.c_str(), tbName.c_str());
+        DEBUG_INFO(cout << "sql: " << order << endl);
+
+        string sqlResult;
+        sqlResult += "<html><body><br/>";
+
+        if (sqlQueryCb_(order, sqlResult)) {
+            sqlResult += "</body></html>";
+            DEBUG_INFO(cout << "sql success." << endl);
+            DEBUG_INFO(cout << "sqlResult: " << sqlResult << endl);
+            
+            mmpUsed = false;
+            reqFileAddr_ = const_cast<char*>(sqlResult.c_str());
+            reqFileSize_ = sqlResult.size() + 1;    // '\0'
+
+            DEBUG_INFO(cout << "reqFileAddr_: " << reqFileAddr_ << endl);
+
+            return FILE_REQUEST;
+        }
+        else  httpInfo_.url = "otherError.html";
     }
 
     if (httpInfo_.url[0] == '5')
@@ -329,6 +362,8 @@ HttpConnection::HTTP_CODE HttpConnection::doRequest() {
     int fd = open(requestPath_.c_str(), O_RDONLY);
     // 将资源文件映射到内存 MAP_PRIVATE
     reqFileAddr_ = (char *)mmap(0, reqFileState_.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    reqFileSize_ = reqFileState_.st_size;
+    mmpUsed = true;
     close(fd);
 
     return FILE_REQUEST;
@@ -363,12 +398,12 @@ bool HttpConnection::writeResponse(HTTP_CODE rqcode) {
         }
         case FILE_REQUEST: {
             addStatusLine(200, ok_200_title);
-            if (reqFileState_.st_size != 0) {
-                addHeaders(reqFileState_.st_size);
+            if (reqFileSize_ != 0) {
+                mmpUsed ? addHeaders(reqFileSize_) : addHeaders(reqFileSize_, TEXT_HTML);
                 iov_[0].iov_base = writeBuffer_.readStartPtr();
                 iov_[0].iov_len = writeBuffer_.readableBytes();
                 iov_[1].iov_base = reqFileAddr_;
-                iov_[1].iov_len = reqFileState_.st_size;
+                iov_[1].iov_len = reqFileSize_;
                 iovCount_ = 2;
                 return true;
             }
@@ -411,7 +446,20 @@ bool HttpConnection::addStatusLine(int status, const char* title) {
     return addResponse("%s %d %s\r\n", "HTTP/1.1", status, title);
 }
 
-bool HttpConnection::addHeaders(int contentLength) {
+bool HttpConnection::addHeaders(int contentLength, CONTENT_TYPE contentType) {
+    switch (contentType) {
+        case TYPE_NULL: DEBUG_INFO(cout << "null" << endl); break;
+        case TEXT_HTML: 
+            if (!addResponse("Content-Type: %s\r\n", "text/html;charset=utf-8")) return false;
+            DEBUG_INFO(cout << "text/html" << endl);
+            break;
+        case TEXT_PLAIN: 
+            if (!addResponse("Content-Type: %s\r\n", "text/plain;charset=utf-8")) return false;
+            DEBUG_INFO(cout << "text/plain" << endl);
+            break;
+        default: break;
+    }
+
     if (!addResponse("Content-Length: %d\r\n", contentLength))
         return false;
     if (!addResponse("Connection: %s\r\n", (httpInfo_.keepAlive == true) ? "keep-alive" : "close"))
@@ -428,9 +476,10 @@ bool HttpConnection::addContent(const char* content) {
 }
 
 void HttpConnection::unmap() {
-    if (reqFileAddr_) {
+    if (mmpUsed && reqFileAddr_) {
         munmap(reqFileAddr_, reqFileState_.st_size);
         reqFileAddr_ = nullptr;
+        mmpUsed = false;
     }
 }
 

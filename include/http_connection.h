@@ -29,6 +29,7 @@
 #endif
 
 typedef function<bool(const string&, const string&)> sqlCallback;
+typedef function<bool(const char*, string&)> sqlQueryCallback;
 
 struct ClientInfo {
     struct sockaddr_in address;             // 客户端地址和端口信息
@@ -83,6 +84,10 @@ private:
         CLOSED_CONNECTION
     };
 
+    enum CONTENT_TYPE {
+        TYPE_NULL, TEXT_HTML, TEXT_PLAIN, IMAGE_JPEG, IMAGE_GIF, VIDEO_MPEG
+    };
+
     static constexpr int READ_BUFFER_SIZE = 2048;
     static constexpr int WRITE_BUFFER_SIZE = 1024;
 
@@ -97,7 +102,7 @@ private:
     bool writeResponse(HTTP_CODE rqcode);
     bool addResponse(const char* format, ...);
     bool addStatusLine(int status, const char* title);
-    bool addHeaders(int contentLength);
+    bool addHeaders(int contentLength, CONTENT_TYPE contentType = TYPE_NULL);
     bool addContent(const char* content);
 
 public:
@@ -108,7 +113,7 @@ public:
     ssize_t httpWrite(int* saveErrno);		// writeBuffer_ -> TCP
     bool httpProcess();			            // readBuffer_ -> process -> writeBuffer_
 
-    void init(sockaddr_in& address, int sockfd, sqlCallback loginCb, sqlCallback registerCb);
+    void init(sockaddr_in& address, int sockfd, sqlCallback loginCb, sqlCallback registerCb, sqlQueryCallback sqlQueryCb);
     void init();
     void closeConnection();
 
@@ -135,9 +140,12 @@ private:
     string requestPath_;                    // 请求资源的路径    
     struct stat reqFileState_;              // 请求资源的状态
     char* reqFileAddr_;                     // 客户请求的文件被映射到内存的起始位置
+    size_t reqFileSize_;
+    bool mmpUsed;
 
     sqlCallback loginCb_;                   // 数据库查询相关回调
     sqlCallback registerCb_;
+    sqlQueryCallback sqlQueryCb_;
 
     struct iovec iov_[2];
     int iovCount_;  
