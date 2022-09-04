@@ -9,7 +9,7 @@ WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sq
     timers_ = new TimerMinHeap(timeout);
 
     // 初始化数据库连接池
-    sqlConnPool_ = connection_pool::GetInstance();
+    sqlConnPool_ = SQLConnectionPool::GetInstance();
     sqlConnPool_->init("localhost", sqlUser, sqlPasswd, sqlDataBaseName, 3306, 8);
     
     // 初始化用户信息(用户名和密码)
@@ -24,9 +24,9 @@ WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sq
 
     // 初始化日志
     if (isAsynLog)
-        Log::getInstance()->init("ServerLog", 80000, 8);  // 异步日志模型
+        Log::getInstance()->init("ServerLog", 800000, 8);  // 异步日志模型
     else
-        Log::getInstance()->init("ServerLog", 80000, 0);  // 同步日志模型
+        Log::getInstance()->init("ServerLog", 800000, 0);  // 同步日志模型
 }
 
 WebServer::~WebServer() {
@@ -65,7 +65,7 @@ void WebServer::initListenSocket() {
 void WebServer::initUserCache() {
     // 先从连接池中取一个连接
     MYSQL* mysql = nullptr;
-    connectionRAII mysqlcon(&mysql, sqlConnPool_);
+    SQLConnectionRAII mysqlcon(&mysql, sqlConnPool_);
 
     // 在user表中检索username，passwd数据，浏览器端输入
     if (mysql_query(mysql, "SELECT username,passwd FROM user")) {
@@ -101,7 +101,7 @@ bool WebServer::loginVerify(const string& userName, const string& passwd) {
 
     // 若不存在, 则查询数据库
     MYSQL* mysql = nullptr;
-    connectionRAII mysqlcon(&mysql, sqlConnPool_);
+    SQLConnectionRAII mysqlcon(&mysql, sqlConnPool_);
     
     char order[256] = {0};
     snprintf(order, 256, "SELECT username,passwd FROM user WHERE username='%s' LIMIT 1", userName.c_str());
@@ -137,7 +137,7 @@ bool WebServer::registerVerify(const string& userName, const string& passwd) {
     }
 
     MYSQL* mysql = nullptr;
-    connectionRAII mysqlcon(&mysql, sqlConnPool_);
+    SQLConnectionRAII mysqlcon(&mysql, sqlConnPool_);
     
     char order[256] = {0};
     snprintf(order, 256, "INSERT INTO user(username, passwd) VALUES('%s', '%s')", userName.c_str(), passwd.c_str());
@@ -158,7 +158,7 @@ bool WebServer::sqlQuery(const char* sqlOrder, string& sqlResult) {
     }
 
     MYSQL* mysql = nullptr;
-    connectionRAII mysqlcon(&mysql, sqlConnPool_);
+    SQLConnectionRAII mysqlcon(&mysql, sqlConnPool_);
 
     MYSQL_FIELD* fields = nullptr;
     MYSQL_RES* res = nullptr;

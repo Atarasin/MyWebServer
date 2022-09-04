@@ -1,147 +1,88 @@
 #include "../include/sql_connection_pool.h"
 
-using namespace std;
-
-connection_pool::connection_pool()
-{
-	this->CurConn = 0;
-	this->FreeConn = 0;
-}
-
-connection_pool *connection_pool::GetInstance()
-{
-	static connection_pool connPool;
+SQLConnectionPool* SQLConnectionPool::GetInstance() {
+	static SQLConnectionPool connPool;
 	return &connPool;
 }
 
-// 构造初始化
-void connection_pool::init(string url, string User, string PassWord, string DBName, int Port, unsigned int MaxConn)
-{
-	this->url = url;
-	this->Port = Port;
-	this->User = User;
-	this->PassWord = PassWord;
-	this->DatabaseName = DBName;
+void SQLConnectionPool::init(string url, string user, string passWord, string DBName, unsigned int port, unsigned int maxConn) {
+	url_ = url;
+	port_ = port;
+	user_ = user;
+	passWord_ = passWord;
+	databaseName_ = DBName;
+    MaxConn = maxConn;
 
-	lock.lock();
     // 建立一定数量MaxConn的数据库连接
-	for (int i = 0; i < MaxConn; i++)
-	{
-		MYSQL *con = NULL;
+	for (int i = 0; i < maxConn; i++) {
+		MYSQL* con = NULL;
 		con = mysql_init(con);      // 初始化mysql连接
-
-		if (con == NULL)
-		{
-			cout << "Error:" << mysql_error(con);
+		if (con == NULL) {
+			DEBUG_INFO(cout << "Error:" << mysql_error(con));
 			exit(1);
 		}
-        // 建立一个到mysql数据库的连接
-		con = mysql_real_connect(con, url.c_str(), User.c_str(), PassWord.c_str(), DBName.c_str(), Port, NULL, 0);
 
-		if (con == NULL)
-		{
-			cout << "Error: " << mysql_error(con);
+        // 建立一个到mysql数据库的连接
+		con = mysql_real_connect(con, url_.c_str(), user_.c_str(), passWord_.c_str(), databaseName_.c_str(), port_, NULL, 0);
+		if (con == NULL) {
+			DEBUG_INFO(cout << "Error:" << mysql_error(con));
 			exit(1);
 		}
 
         // 设置mysql字符集 (避免查询数据在网页上显示时出现乱码)
         mysql_set_character_set(con, "utf8");
 
-        // 将mysql数据库连接全部放入到双向链表中
-		connList.push_back(con);
-		++FreeConn;
+		connList_.push_back(con);
 	}
-
-    // 初始化信号量, FreeConn表示可用的数据库连接数
-	reserve = sem(FreeConn);
-
-	this->MaxConn = FreeConn;
-	
-	lock.unlock();
 }
 
+// customer
+MYSQL* SQLConnectionPool::GetConnection() {
+    unique_lock<mutex> locker(mtx_);
 
-// 当有请求时，从数据库连接池中返回一个可用连接，更新使用和空闲连接数
-MYSQL *connection_pool::GetConnection()
-{
-	MYSQL *con = NULL;
+    while (connList_.empty()) {
+        cond_.wait(locker);
+    }
 
-	if (0 == connList.size())
-		return NULL;
+    MYSQL* con = connList_.front();
+    connList_.pop_back();
 
-	reserve.wait();
-	
-	lock.lock();
-
-	con = connList.front();
-	connList.pop_front();
-
-	--FreeConn;
-	++CurConn;
-
-	lock.unlock();
 	return con;
 }
 
-// 释放当前使用的连接
-bool connection_pool::ReleaseConnection(MYSQL *con)
-{
-	if (NULL == con)
-		return false;
+// producer
+bool SQLConnectionPool::ReleaseConnection(MYSQL* con) {
+	if (con == nullptr) return false;
 
-	lock.lock();
+    {
+        lock_guard<mutex> locker(mtx_);
+        connList_.push_back(con);
+    }
+    cond_.notify_one();
 
-	connList.push_back(con);
-	++FreeConn;
-	--CurConn;
-
-	lock.unlock();
-
-	reserve.post();
-	return true;
+    return true;
 }
 
 // 销毁数据库连接池
-void connection_pool::DestroyPool()
-{
+void SQLConnectionPool::DestroyPool() {
+    lock_guard<mutex> locker(mtx_);
 
-	lock.lock();
-	if (connList.size() > 0)
-	{
-		list<MYSQL *>::iterator it;
-		for (it = connList.begin(); it != connList.end(); ++it)
-		{
-			MYSQL *con = *it;
+	if (!connList_.empty()) {
+		list<MYSQL*>::iterator it;
+		for (it = connList_.begin(); it != connList_.end(); ++it) {
+			MYSQL* con = *it;
 			mysql_close(con);
 		}
-		CurConn = 0;
-		FreeConn = 0;
-		connList.clear();
-
-		lock.unlock();
+		connList_.clear();
 	}
-
-	lock.unlock();
 }
 
-// 当前空闲的连接数
-int connection_pool::GetFreeConn()
-{
-	return this->FreeConn;
-}
-
-connection_pool::~connection_pool()
-{
-	DestroyPool();
-}
-
-connectionRAII::connectionRAII(MYSQL **sql, connection_pool *connPool) {
+SQLConnectionRAII::SQLConnectionRAII(MYSQL** sql, SQLConnectionPool* connPool) {
 	*sql = connPool->GetConnection();
-	
 	sqlRAII = *sql;
 	poolRAII = connPool;
 }
 
-connectionRAII::~connectionRAII() {
+SQLConnectionRAII::~SQLConnectionRAII() {
 	poolRAII->ReleaseConnection(sqlRAII);
 }

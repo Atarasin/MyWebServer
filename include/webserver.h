@@ -56,7 +56,7 @@ private:
     Epoller* epoller_;
     TimerMinHeap* timers_;                  // 定时器最小堆
     ThreadPool<taskCallback>* threadPool_;  // 线程池
-    connection_pool* sqlConnPool_;          // 数据库连接池
+    SQLConnectionPool* sqlConnPool_;        // 数据库连接池
 
     HttpConnection* users_;                 // HTTP连接
     client_data* usersData_;                // 客户端信息集合

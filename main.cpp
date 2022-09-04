@@ -9,12 +9,6 @@
 #include <cassert>
 #include <sys/epoll.h>
 
-#include "../include/locker.h"
-#include "../include/timer_minheap.h"
-#include "../include/http_connection.h"
-#include "../include/log.h"
-#include "../include/sql_connection_pool.h"
-#include "../include/threadpool.h"
 #include "../include/webserver.h"
 
 int main () {

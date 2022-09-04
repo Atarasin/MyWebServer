@@ -1,5 +1,5 @@
-#ifndef _CONNECTION_POOL_H
-#define _CONNECTION_POOL_H
+#ifndef _SQLConnectionPool_H
+#define _SQLConnectionPool_H
 
 #include <stdio.h>
 #include <list>
@@ -8,56 +8,58 @@
 #include <string.h>
 #include <iostream>
 #include <string>
-#include "locker.h"
 #include <stdlib.h>
-#include <pthread.h>
+#include <mutex>
+#include <condition_variable>
+
+#ifdef DEBUG_MODE
+#define DEBUG_INFO(x) x
+#else
+#define DEBUG_INFO(x)
+#endif
 
 using namespace std;
 
-class connection_pool {
+class SQLConnectionPool {
 public:
-	MYSQL *GetConnection();				 //获取数据库连接
-	bool ReleaseConnection(MYSQL *sql); //释放连接
-	int GetFreeConn();					 //获取连接
-	void DestroyPool();					 //销毁所有连接
+	MYSQL* GetConnection();				    //获取数据库连接
+	bool ReleaseConnection(MYSQL *sql);     //释放连接
+	void DestroyPool();					    //销毁所有连接
 
 	// 单例模式
-	static connection_pool *GetInstance();
+	static SQLConnectionPool* GetInstance();
 
-	void init(string url, string User, string PassWord, string DataBaseName, int Port, unsigned int MaxConn); 
+	void init(string url, string user, string passWord, string DBName, unsigned int port, unsigned int maxConn); 
 	
 private:
-	connection_pool();
-	~connection_pool();
+	SQLConnectionPool() = default;
+	~SQLConnectionPool() { DestroyPool(); }
 
 private:
-	unsigned int MaxConn;  //最大连接数
-	unsigned int CurConn;  //当前已使用的连接数
-	unsigned int FreeConn; //当前空闲的连接数
+	unsigned int MaxConn;           //最大连接数
 
 private:
-	locker lock;
-	list<MYSQL*> connList; //连接池
-	sem reserve;
+	list<MYSQL*> connList_;         //连接池
+    mutex mtx_;
+    condition_variable cond_;
 
 private:
-	string url;			 //主机地址
-	string Port;		 //数据库端口号
-	string User;		 //登陆数据库用户名
-	string PassWord;	 //登陆数据库密码
-	string DatabaseName; //使用数据库名
+	string url_;			        //主机地址
+	unsigned int port_;		        //数据库端口号
+	string user_;		            //登陆数据库用户名
+	string passWord_;	            //登陆数据库密码
+	string databaseName_;           //使用数据库名
 };
 
-class connectionRAII{
-
+class SQLConnectionRAII {
 public:
     // sql是一个传出参数, 为的是可以改变指针的值
-	connectionRAII(MYSQL **sql, connection_pool *connPool);
-	~connectionRAII();
+	SQLConnectionRAII(MYSQL** sql, SQLConnectionPool* connPool);
+	~SQLConnectionRAII();
 	
 private:
-	MYSQL *sqlRAII;                     // 数据库连接池的一个连接
-	connection_pool *poolRAII;          // 数据库连接池
+	MYSQL* sqlRAII;                         // 数据库连接池的一个连接
+	SQLConnectionPool* poolRAII;            // 数据库连接池
 };
 
 #endif
