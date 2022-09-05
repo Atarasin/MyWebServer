@@ -1,5 +1,9 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.1)
 project (MyWebServer VERSION 0.1.0 LANGUAGES CXX)
+
+# 控制整个项目的C++编译版本
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(IS_DEBUG "debug info something" OFF)
 if(IS_DEBUG)
@@ -8,7 +12,6 @@ if(IS_DEBUG)
 else()
     message(STATUS "DEBUG MODE OFF")
 endif()
-
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Configuring on/for Linux")
