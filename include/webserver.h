@@ -9,6 +9,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <memory>
 #include <mysql/mysql.h>
 
 #include "http_connection.h"
@@ -51,22 +52,24 @@ private:
     void process(int sockfd);
 
 private:
-    int listenfd_;                          // 监听的TCP文件描述符
-    int port_;                              // 监听端口
-    Epoller* epoller_;
-    TimerMinHeap* timers_;                  // 定时器最小堆
-    ThreadPool<taskCallback>* threadPool_;  // 线程池
-    SQLConnectionPool* sqlConnPool_;        // 数据库连接池
+    static constexpr int maxHttpConns_ = 65536;                 // 最多的HTTP连接数
 
-    HttpConnection* users_;                 // HTTP连接
-    client_data* usersData_;                // 客户端信息集合
+    int listenfd_;                                              // 监听的TCP文件描述符
+    int port_;                                                  // 监听端口
 
-    map<string, string> userCache_;          // 记录用户名和密码
+    SQLConnectionPool* sqlConnPool_;                            // 数据库连接池
+
+    unique_ptr<Epoller> epoller_;
+    unique_ptr<TimerMinHeap> timers_;
+    unique_ptr<ThreadPool<taskCallback>> threadPool_;
+
+    unique_ptr<HttpConnection[]> users_;                        // HTTP连接池
+    unique_ptr<client_data[]> usersData_;                       // 客户端信息集合
+
+    map<string, string> userCache_;                             // 记录用户名和密码
     mutex userCacheMtx_;
     bool isET_;
-
-    bool isStop_ = false;
-    int maxHttpConns_ = 65536;              // 最多的HTTP连接数
+    bool isStop_;
 };
 
 #endif

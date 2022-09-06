@@ -1,12 +1,15 @@
 #include "../include/webserver.h"
 
 WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sqlUser, string sqlPasswd, string sqlDataBaseName) : 
-    port_(port), isET_(isET), epoller_(new Epoller()) {
+    port_(port), isET_(isET), epoller_(new Epoller()), timers_(new TimerMinHeap(timeout)),
+    threadPool_(new ThreadPool<taskCallback>()),
+    users_(new HttpConnection[maxHttpConns_]),
+    usersData_(new client_data[maxHttpConns_]) {
+
+    isStop_ = false;
 
     // 初始化监听描述符
     initListenSocket();
-
-    timers_ = new TimerMinHeap(timeout);
 
     // 初始化数据库连接池
     sqlConnPool_ = SQLConnectionPool::GetInstance();
@@ -14,13 +17,6 @@ WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sq
     
     // 初始化用户信息(用户名和密码)
     initUserCache();
-    
-    // 初始化HTTP连接池
-    users_ = new HttpConnection[maxHttpConns_];
-    usersData_ = new client_data[maxHttpConns_];
-
-    // 初始化线程池
-    threadPool_ = new ThreadPool<taskCallback>();
 
     // 初始化日志
     if (isAsynLog)
@@ -31,13 +27,6 @@ WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sq
 
 WebServer::~WebServer() {
     close(listenfd_);
-
-    delete epoller_;
-    delete timers_;
-    delete threadPool_;
-
-    delete[] users_;
-    delete[] usersData_;
 }
 
 void WebServer::initListenSocket() {
