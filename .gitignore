@@ -1,3 +1,5 @@
-build/
+.vscode
+build
 logs/*
 include/LFU_cache.h
+include/memory_pool.h
