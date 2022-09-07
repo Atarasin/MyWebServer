@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 #include <list>
+#include <mutex>
 
 using namespace std;
 
@@ -35,6 +36,7 @@ private:
     unordered_map<freq_type, LRU_list_pointer>      freqMap_;
     size_t maxSize_;
     size_t minFreq_;
+    mutex mtx_;
 
 private:
     // freq -> freq + 1
@@ -62,7 +64,9 @@ public:
     LFUCache(const LFUCache& cache) = delete;
     LFUCache& operator= (const LFUCache& cache) = delete;
 
-    void set(key_type key, value_type val) {
+    void set(const key_type& key, const value_type& val) {
+        lock_guard<mutex> locker(mtx_);
+
         // 若key存在, 则更新节点
         if (keyMap_.find(key) != keyMap_.end()) {
             node_iterator nodeIt = keyMap_[key];
@@ -90,7 +94,9 @@ public:
         minFreq_ = 1;
     }
 
-    bool get(key_type key, value_type& val) {
+    bool get(const key_type& key, value_type& val) {
+        lock_guard<mutex> locker(mtx_);
+        
         if (maxSize_ == 0 || keyMap_.find(key) == keyMap_.end())
             return false;
         

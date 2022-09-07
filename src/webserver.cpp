@@ -4,7 +4,7 @@ const vector<string> WebServer::watchDbs {"mydatabase", "webserver"};
 
 WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sqlUser, string sqlPasswd, string sqlDataBaseName) : 
     port_(port), isET_(isET), epoller_(new Epoller()), timers_(new TimerMinHeap(timeout)),
-    threadPool_(new ThreadPool<taskCallback>()), lfuDbCache_(new LFUDbCache(20)),
+    threadPool_(new ThreadPool<taskCallback>()), lfuDbCache_(new LFUDbCache(2)),
     users_(new HttpConnection[maxHttpConns_]),
     usersData_(new client_data[maxHttpConns_]) {
 
@@ -185,12 +185,12 @@ bool WebServer::sqlQuery(const string& dbName, const string& tbName, string& sql
         return false;
     }
 
-    // // LFU缓存命中
-    // string key = dbName + "_" + tbName;
-    // if (lfuDbCache_->get(key, sqlResult)) {
-    //     DEBUG_INFO(cout << "in cache(sqlQuery)" << endl);
-    //     return true;
-    // }
+    // LFU缓存命中
+    string key = dbName + "_" + tbName;
+    if (lfuDbCache_->get(key, sqlResult)) {
+        DEBUG_INFO(cout << "in cache(sqlQuery)" << endl);
+        return true;
+    }
 
     DEBUG_INFO(cout << "in mysql server(sqlQuery)" << endl);
 
@@ -235,7 +235,7 @@ bool WebServer::sqlQuery(const string& dbName, const string& tbName, string& sql
     
     mysql_free_result(res);
 
-    // lfuDbCache_->set(key, sqlResult);
+    lfuDbCache_->set(key, sqlResult);
     
     return true;
 }
