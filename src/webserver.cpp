@@ -4,7 +4,7 @@ const vector<string> WebServer::watchDbs {"mydatabase", "webserver"};
 
 WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sqlUser, string sqlPasswd, string sqlDataBaseName) : 
     port_(port), isET_(isET), epoller_(new Epoller()), timers_(new TimerMinHeap(timeout)),
-    threadPool_(new ThreadPool<taskCallback>()),
+    threadPool_(new ThreadPool<taskCallback>()), lfuDbCache_(new LFUDbCache(20)),
     users_(new HttpConnection[maxHttpConns_]),
     usersData_(new client_data[maxHttpConns_]) {
 
@@ -181,11 +181,18 @@ bool WebServer::registerVerify(const string& userName, const string& passwd) {
 bool WebServer::sqlQuery(const string& dbName, const string& tbName, string& sqlResult) {
     // 空节点查询
     if (dbCache_.find(dbName) == dbCache_.end() || dbCache_[dbName].find(tbName) == dbCache_[dbName].end()) {
-        DEBUG_INFO(cout << "null node query" << endl);
+        DEBUG_INFO(cout << "null node query(sqlQuery)" << endl);
         return false;
     }
 
-    DEBUG_INFO(cout << "in mysql server" << endl);
+    // // LFU缓存命中
+    // string key = dbName + "_" + tbName;
+    // if (lfuDbCache_->get(key, sqlResult)) {
+    //     DEBUG_INFO(cout << "in cache(sqlQuery)" << endl);
+    //     return true;
+    // }
+
+    DEBUG_INFO(cout << "in mysql server(sqlQuery)" << endl);
 
     MYSQL* mysql = nullptr;
     SQLConnectionRAII mysqlcon(&mysql, sqlConnPool_);
@@ -219,14 +226,16 @@ bool WebServer::sqlQuery(const string& dbName, const string& tbName, string& sql
         for (int i = 0; i < num_fields; ++i) {
             sqlResult += (row[i] ? row[i] : "NULL");
             sqlResult.push_back(',');
-            DEBUG_INFO(cout << "row " << i << ": " << (int)lengths[i] << ", " << (row[i] ? row[i] : "NULL") << " ");
+            // DEBUG_INFO(cout << "row " << i << ": " << (int)lengths[i] << ", " << (row[i] ? row[i] : "NULL") << " ");
         }
         sqlResult.pop_back();
         sqlResult += "<br/>\n";
-        DEBUG_INFO(cout << endl);
+        // DEBUG_INFO(cout << endl);
     }
     
     mysql_free_result(res);
+
+    // lfuDbCache_->set(key, sqlResult);
     
     return true;
 }
@@ -282,10 +291,12 @@ bool WebServer::dealReadEvent(int sockfd) {
 
     // 若接收失败, 则关闭TCP连接 (=0说明对方断开连接)
     if (len <= 0 && (readErrno != EAGAIN && readErrno != EWOULDBLOCK)) {
+        DEBUG_INFO(strerror(readErrno)); 
         closeConnection(sockfd);
         return false;
     }
 
+    // 若是LT模式, 此时HTTP请求可能还没有完全接收
     threadPool_->append(bind(&WebServer::process, this, sockfd));
 
     if (timer) {

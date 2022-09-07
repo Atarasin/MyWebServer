@@ -100,8 +100,15 @@ public:
         return (res == writeStartPtrConst()) ? nullptr : res;
     }
 
+    // buffer -> other
+    void readBytes(size_t nBytes) {
+        if (nBytes > readableBytes())
+            throw runtime_error("Buffer::readBytes: this is no available bytes to read.");
+        readIdx_ += nBytes;
+    }
+    
     void readBytesUntil(const char* end) {
-        if (end >= writeStartPtr())
+        if (end > writeStartPtr())
             throw runtime_error("Buffer::readBytesUntil: it is not in the readable region.");
         
         readBytes(end - readStartPtr());
@@ -112,12 +119,6 @@ public:
         writeIdx_ = PREPEND_SPACE_SIZE;
     }
 
-    // buffer -> other
-    void readBytes(size_t nBytes) {
-        if (nBytes > readableBytes())
-            throw runtime_error("Buffer::readBytes: this is no available bytes to read.");
-        readIdx_ += nBytes;
-    }
     // other -> buffer
     void writeBytes(char* data, size_t nBytes) {
         if (nBytes > writableBytes()) {

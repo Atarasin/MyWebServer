@@ -4,7 +4,7 @@
 #include <sys/types.h> 
 #include <sys/socket.h>
 #include <errno.h>
-#include <string>
+#include <string.h>                 // strerror
 #include <netinet/in.h>
 #include <functional>
 #include <unordered_map>
@@ -12,6 +12,7 @@
 #include <vector>
 #include <mutex>
 #include <memory>
+#include <string>
 #include <mysql/mysql.h>
 
 #include "http_connection.h"
@@ -20,11 +21,13 @@
 #include "log.h"
 #include "threadpool.h"
 #include "sql_connection_pool.h"
+#include "LFU_cache.hpp"
 
 using namespace std;
 
-typedef function<bool(const string&, const string&)> sqlCallback;
-typedef function<void()> taskCallback;
+typedef function<bool(const string&, const string&)>        sqlCallback;
+typedef function<void()>                                    taskCallback;
+typedef LFUCache<string, string>                            LFUDbCache;
 
 class WebServer {
 public:
@@ -47,7 +50,7 @@ private:
     void closeConnection(int sockfd);
     void closeConnection_(int sockfd);
 
-    // 多线程
+    // 多线程 (数据库连接的争用)
     bool loginVerify(const string& userName, const string& passwd);
     bool registerVerify(const string& userName, const string& passwd);
     void updateUserCache(const string& userName, const string& passwd);
@@ -67,6 +70,7 @@ private:
     unique_ptr<Epoller> epoller_;
     unique_ptr<TimerMinHeap> timers_;
     unique_ptr<ThreadPool<taskCallback>> threadPool_;
+    unique_ptr<LFUDbCache> lfuDbCache_;
 
     unique_ptr<HttpConnection[]> users_;                        // HTTP连接池
     unique_ptr<client_data[]> usersData_;                       // 客户端信息集合

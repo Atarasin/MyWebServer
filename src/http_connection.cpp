@@ -76,11 +76,9 @@ ssize_t HttpConnection::httpRead(int* saveErrno) {
     do {
         len = readBuffer_.readFd(clientInfo_.sockfd, saveErrno);
         if (len <= 0) break;
-
     } while (isEt);
 
-    // readBuffer_.printStatus();
-    // readBuffer_.printBuffer();
+    // DEBUG_INFO(readBuffer_.printBuffer());
 
     return len;
 }
@@ -142,12 +140,10 @@ HttpConnection::HTTP_CODE HttpConnection::parseRequest() {
     HTTP_CODE rqStatus = NO_REQUEST;
     LINE_STATUS lineStatus = LINE_OK;
 
-    while (((lineStatus = parseLine()) == LINE_OK) || 
-           ((lineStatus == LINE_OK) && (mainState_ == CHECK_STATE_CONTENT))) {
+    while ((lineStatus = parseLine()) == LINE_OK) {
         string line(readBuffer_.readStartPtrConst(), lineEnd_);
 
-        // cout << "A new line: " << line << endl;
-        // cout << "main state: " << mainState_ << endl;
+        // DEBUG_INFO(cout << "A new line: " << line << endl);
 
         switch (mainState_) {
             // 分析请求行
@@ -167,31 +163,35 @@ HttpConnection::HTTP_CODE HttpConnection::parseRequest() {
                     return doRequest();
                 break;
             }
-            // 分析请求体
+            // 分析请求体 (一次全部读取)
             case CHECK_STATE_CONTENT: {
                 rqStatus = parseRequestBody(line);
                 // POST
                 if (rqStatus == GET_REQUEST)
                     return doRequest();
-                lineStatus = LINE_OPEN;
-                break;
+                return NO_REQUEST;          // 这里应该返回, 否则可能会调用readBuffer_.readBytesUntil()出错
             }
             default:
                 return INTERNAL_ERROR;
         }
 
-        readBuffer_.readBytesUntil(lineEnd_ + 2);
+        readBuffer_.readBytesUntil(lineEnd_ + 2);           // 过滤\r\n (若是处于解析请求体的状态, 则不应该执行该语句)
     }
 
     return NO_REQUEST;
 }
 
 HttpConnection::LINE_STATUS HttpConnection::parseLine() {
+    // 若是正在解析请求体, buffer中不存在\r\n, 只能根据Content-Length字段确定数据是否完整
     if (mainState_ == CHECK_STATE_CONTENT) {
-        lineEnd_ = readBuffer_.writeStartPtrConst();
+        if (readBuffer_.readableBytes() < httpInfo_.contentLength)
+            return LINE_OPEN;
+        
+        lineEnd_ = readBuffer_.readStartPtrConst() + httpInfo_.contentLength;
         return LINE_OK;
     }
 
+    // 其它情况根据\r\n判断数据是否完整
     lineEnd_ = readBuffer_.findCRLF();
     return (lineEnd_ == nullptr) ? LINE_OPEN : LINE_OK;
 }
@@ -208,9 +208,6 @@ HttpConnection::HTTP_CODE HttpConnection::parseRequestLine(const string& text) {
     httpInfo_.method = m[1].str();
     httpInfo_.url = m[2].str();
     httpInfo_.version = m[3].str();
-
-    // cout << "httpInfo: method - " << httpInfo_.method << ", url - "
-    //      << httpInfo_.url << ", version - " << httpInfo_.version << endl;
 
     // http://ip:port/xxx | https://ip:port/xxx -> xxx
     string::size_type n = httpInfo_.url.find("//");
@@ -237,9 +234,8 @@ HttpConnection::HTTP_CODE HttpConnection::parseRequestLine(const string& text) {
     Connection: keep-alive
 */
 HttpConnection::HTTP_CODE HttpConnection::parseRequestHeader(const string& text) {
-    // ""
+    // 请求行与请求体之间的空行: text = ""
     if (text.empty()) {
-        // cout << "content-Length: " << httpInfo_.contentLength << endl;
         if (httpInfo_.contentLength > 0) {
             mainState_ = CHECK_STATE_CONTENT;
             return NO_REQUEST;
@@ -318,13 +314,11 @@ HttpConnection::HTTP_CODE HttpConnection::doRequest() {
         if (sqlQueryCb_(dbName, tbName, sqlResult)) {
             sqlResult += "</body></html>";
             DEBUG_INFO(cout << "sql success." << endl);
-            DEBUG_INFO(cout << "sqlResult: " << sqlResult << endl);
+            // DEBUG_INFO(cout << "sqlResult: " << sqlResult << endl);
             
             mmpUsed = false;
             reqFileAddr_ = const_cast<char*>(sqlResult.c_str());
             reqFileSize_ = sqlResult.size() + 1;    // '\0'
-
-            DEBUG_INFO(cout << "reqFileAddr_: " << reqFileAddr_ << endl);
 
             return FILE_REQUEST;
         }
@@ -444,14 +438,12 @@ bool HttpConnection::addStatusLine(int status, const char* title) {
 
 bool HttpConnection::addHeaders(int contentLength, CONTENT_TYPE contentType) {
     switch (contentType) {
-        case TYPE_NULL: DEBUG_INFO(cout << "null" << endl); break;
+        case TYPE_NULL: break;
         case TEXT_HTML: 
             if (!addResponse("Content-Type: %s\r\n", "text/html;charset=utf-8")) return false;
-            DEBUG_INFO(cout << "text/html" << endl);
             break;
         case TEXT_PLAIN: 
             if (!addResponse("Content-Type: %s\r\n", "text/plain;charset=utf-8")) return false;
-            DEBUG_INFO(cout << "text/plain" << endl);
             break;
         default: break;
     }
