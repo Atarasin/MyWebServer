@@ -11,7 +11,7 @@
 #include <sstream>
 #include <iomanip>
 
-#include "block_queue.h"
+#include "block_queue.hpp"
 #include "buffer.h"
 
 using namespace std;
