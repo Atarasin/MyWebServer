@@ -29,7 +29,7 @@
 #endif
 
 typedef function<bool(const string&, const string&)> sqlCallback;
-typedef function<bool(const char*, string&)> sqlQueryCallback;
+typedef function<bool(const string&, const string&, string&)> sqlQueryCallback;
 
 struct ClientInfo {
     struct sockaddr_in address;             // 客户端地址和端口信息

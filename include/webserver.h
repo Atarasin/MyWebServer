@@ -7,7 +7,9 @@
 #include <string>
 #include <netinet/in.h>
 #include <functional>
-#include <map>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include <mutex>
 #include <memory>
 #include <mysql/mysql.h>
@@ -35,12 +37,8 @@ public:
 
 private:
     void initListenSocket();
-    void initUserCache();
-
-    bool loginVerify(const string& userName, const string& passwd);
-    bool registerVerify(const string& userName, const string& passwd);
-    void updateUserCache(const string& userName, const string& passwd);
-    bool sqlQuery(const char* sqlOrder, string& sqlResult);
+    bool initUserCache();
+    bool initDbCache();
 
     // epoll事件处理函数
     bool dealListenEvent();
@@ -49,10 +47,17 @@ private:
     void closeConnection(int sockfd);
     void closeConnection_(int sockfd);
 
+    // 多线程
+    bool loginVerify(const string& userName, const string& passwd);
+    bool registerVerify(const string& userName, const string& passwd);
+    void updateUserCache(const string& userName, const string& passwd);
+    bool sqlQuery(const string& dbName, const string& tbName, string& sqlResult);
+
     void process(int sockfd);
 
 private:
     static constexpr int maxHttpConns_ = 65536;                 // 最多的HTTP连接数
+    static const vector<string> watchDbs;
 
     int listenfd_;                                              // 监听的TCP文件描述符
     int port_;                                                  // 监听端口
@@ -66,8 +71,10 @@ private:
     unique_ptr<HttpConnection[]> users_;                        // HTTP连接池
     unique_ptr<client_data[]> usersData_;                       // 客户端信息集合
 
-    map<string, string> userCache_;                             // 记录用户名和密码
+    unordered_map<string, string> userCache_;                   // 记录用户名和密码
+    unordered_map<string, unordered_set<string>> dbCache_;      // 记录数据库与表的映射
     mutex userCacheMtx_;
+    mutex dbCacheMtx_;
     bool isET_;
     bool isStop_;
 };

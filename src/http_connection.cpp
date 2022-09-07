@@ -310,16 +310,12 @@ HttpConnection::HTTP_CODE HttpConnection::doRequest() {
         string tbName = httpInfo_.requestBody.substr(pos + 7);
 
         DEBUG_INFO(cout << "body: " << httpInfo_.requestBody << endl);
-        DEBUG_INFO(cout << "database: " << dbName << "," << "table:" << tbName << endl);
-
-        char order[256] = {0};
-        snprintf(order, 256, "SELECT * FROM %s.%s", dbName.c_str(), tbName.c_str());
-        DEBUG_INFO(cout << "sql: " << order << endl);
+        DEBUG_INFO(cout << "database: " << dbName << "," << "table: " << tbName << endl);
 
         string sqlResult;
         sqlResult += "<html><body><br/>";
 
-        if (sqlQueryCb_(order, sqlResult)) {
+        if (sqlQueryCb_(dbName, tbName, sqlResult)) {
             sqlResult += "</body></html>";
             DEBUG_INFO(cout << "sql success." << endl);
             DEBUG_INFO(cout << "sqlResult: " << sqlResult << endl);

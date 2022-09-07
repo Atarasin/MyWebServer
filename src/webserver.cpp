@@ -1,5 +1,7 @@
 #include "../include/webserver.h"
 
+const vector<string> WebServer::watchDbs {"mydatabase", "webserver"};
+
 WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sqlUser, string sqlPasswd, string sqlDataBaseName) : 
     port_(port), isET_(isET), epoller_(new Epoller()), timers_(new TimerMinHeap(timeout)),
     threadPool_(new ThreadPool<taskCallback>()),
@@ -17,6 +19,7 @@ WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sq
     
     // 初始化用户信息(用户名和密码)
     initUserCache();
+    initDbCache();
 
     // 初始化日志
     if (isAsynLog)
@@ -51,32 +54,70 @@ void WebServer::initListenSocket() {
     assert(ret >= 0);
 }
 
-void WebServer::initUserCache() {
+bool WebServer::initUserCache() {
     // 先从连接池中取一个连接
     MYSQL* mysql = nullptr;
     SQLConnectionRAII mysqlcon(&mysql, sqlConnPool_);
 
     // 在user表中检索username，passwd数据，浏览器端输入
     if (mysql_query(mysql, "SELECT username,passwd FROM user")) {
-        LOG_ERROR("SELECT error:%s\n", mysql_error(mysql));
+        DEBUG_INFO(cout << "SELECT(error): " << mysql_error(mysql) << endl);
+        return false;
     }
 
     // 从表中检索完整的结果集
-    MYSQL_RES* result = mysql_store_result(mysql);
-
-    // 返回结果集中的列数
-    int num_fields = mysql_num_fields(result);
-
-    // 返回所有字段结构的数组
-    MYSQL_FIELD* fields = mysql_fetch_fields(result);
+    MYSQL_RES* res = mysql_store_result(mysql);
 
     // 从结果集中获取下一行, 将对应的用户名和密码，存入map中
-    while (MYSQL_ROW row = mysql_fetch_row(result)) {
+    while (MYSQL_ROW row = mysql_fetch_row(res)) {
         userCache_[string(row[0])] = string(row[1]);
     }
 
-    for (auto it = userCache_.begin(); it != userCache_.end(); ++it)
-        DEBUG_INFO(cout << "user: " << it->first << ", " << "passwd: " << it->second << endl);
+    mysql_free_result(res);
+
+    DEBUG_INFO(
+        for (auto it = userCache_.begin(); it != userCache_.end(); ++it)
+            cout << "user: " << it->first << ", " << "passwd: " << it->second << endl;
+    );
+    
+    return true;
+}
+
+bool WebServer::initDbCache() {
+    MYSQL* mysql = nullptr;
+    SQLConnectionRAII mysqlcon(&mysql, sqlConnPool_);
+
+    MYSQL_RES* res = nullptr;
+
+    for (const string& dbName : watchDbs) {
+        char order[50] = {0};
+        snprintf(order, 50, "SHOW TABLES FROM %s", dbName.c_str());
+        DEBUG_INFO(cout << "order: " << order << endl);
+
+        if (mysql_query(mysql, order)) {
+            DEBUG_INFO(cout << "SHOW(error): " << mysql_error(mysql) << endl);
+            return false;
+        }
+
+        res = mysql_store_result(mysql);
+
+        while (MYSQL_ROW row = mysql_fetch_row(res)) {
+            dbCache_[dbName].insert(string(row[0]));
+        }
+
+        mysql_free_result(res);
+    }
+
+    DEBUG_INFO(
+        for (auto it = dbCache_.begin(); it != dbCache_.end(); ++it) {
+            cout << it->first << ": ";
+            for (auto jt = it->second.begin(); jt != it->second.end(); ++jt)
+                cout << *jt << ", ";
+            cout << endl;
+        }
+    );
+
+    return true;
 }
 
 bool WebServer::loginVerify(const string& userName, const string& passwd) {
@@ -98,10 +139,8 @@ bool WebServer::loginVerify(const string& userName, const string& passwd) {
     MYSQL_FIELD* fields = nullptr;
     MYSQL_RES* res = nullptr;
 
-    if (mysql_query(mysql, order)) {
-        mysql_free_result(res);
+    if (mysql_query(mysql, order))
         return false;
-    }
 
     res = mysql_store_result(mysql);
     fields = mysql_fetch_fields(res);
@@ -131,20 +170,22 @@ bool WebServer::registerVerify(const string& userName, const string& passwd) {
     char order[256] = {0};
     snprintf(order, 256, "INSERT INTO user(username, passwd) VALUES('%s', '%s')", userName.c_str(), passwd.c_str());
 
-    if (mysql_query(mysql, order)) {
+    if (mysql_query(mysql, order))
         return false;
-    }
     
     updateUserCache(userName, passwd);   // 更新缓存
     
     return true;
 }
 
-bool WebServer::sqlQuery(const char* sqlOrder, string& sqlResult) {
-    // 先尝试从缓存中取数据
-    if (false) {
-
+bool WebServer::sqlQuery(const string& dbName, const string& tbName, string& sqlResult) {
+    // 空节点查询
+    if (dbCache_.find(dbName) == dbCache_.end() || dbCache_[dbName].find(tbName) == dbCache_[dbName].end()) {
+        DEBUG_INFO(cout << "null node query" << endl);
+        return false;
     }
+
+    DEBUG_INFO(cout << "in mysql server" << endl);
 
     MYSQL* mysql = nullptr;
     SQLConnectionRAII mysqlcon(&mysql, sqlConnPool_);
@@ -153,10 +194,12 @@ bool WebServer::sqlQuery(const char* sqlOrder, string& sqlResult) {
     MYSQL_RES* res = nullptr;
     unsigned int num_fields;
 
-    if (mysql_query(mysql, sqlOrder)) {
-        mysql_free_result(res);
+    char sqlOrder[256] = {0};
+    snprintf(sqlOrder, 256, "SELECT * FROM %s.%s", dbName.c_str(), tbName.c_str());
+    DEBUG_INFO(cout << "sql: " << sqlOrder << endl);
+
+    if (mysql_query(mysql, sqlOrder))
         return false;
-    }
 
     res = mysql_store_result(mysql);
     fields = mysql_fetch_fields(res);
@@ -212,7 +255,7 @@ bool WebServer::dealListenEvent() {
     users_[connfd].init(client_address, connfd, 
                     bind(&WebServer::loginVerify, this, placeholders::_1, placeholders::_2), 
                     bind(&WebServer::registerVerify, this, placeholders::_1, placeholders::_2),
-                    bind(&WebServer::sqlQuery, this, placeholders::_1, placeholders::_2));
+                    bind(&WebServer::sqlQuery, this, placeholders::_1, placeholders::_2, placeholders::_3));
     // 注册读事件
     epoller_->addfd(connfd, HttpConnection::isEt, true, true);
 
