@@ -9,8 +9,6 @@
 #include <functional>
 #include <atomic>
 
-#include "sql_connection_pool.h"
-
 template <typename Task>
 class ThreadPool {
 private:
