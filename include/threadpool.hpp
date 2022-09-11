@@ -7,6 +7,7 @@
 #include <vector>
 #include <thread>
 #include <functional>
+#include <atomic>
 
 #include "sql_connection_pool.h"
 
@@ -18,12 +19,11 @@ private:
     std::queue<Task> requests_;                 // 请求队列
     std::mutex mtx_;                            // 互斥锁
     std::condition_variable cond_;              // 条件变量
-
-    bool isStop_ = false;
+    atomic<bool> isStop_;                       // 线程停止标志
 
 public:
     ThreadPool(int threadNum = 8, int maxRequestNum = 10000) : 
-                threadNum_(threadNum), maxRequestNum_(maxRequestNum) {
+                threadNum_(threadNum), maxRequestNum_(maxRequestNum), isStop_(false) {
         assert(threadNum_ >0);
         assert(maxRequestNum_ > 0);
 
@@ -35,11 +35,7 @@ public:
     }
 
     ~ThreadPool() {
-        {
-            std::unique_lock<std::mutex> locker(mtx_);
-            isStop_ = true;
-        }
-        cond_.notify_all();
+        isStop_.store(true);
     }
 
     bool append(Task&& task) {
@@ -57,7 +53,7 @@ public:
 
 private:
     void doTask() {
-        while (!isStop_) {
+        while (!isStop_.load()) {
             Task request = nullptr;
             {
                 std::unique_lock<std::mutex> locker(mtx_);
@@ -70,7 +66,7 @@ private:
                 requests_.pop();
             }
 
-            if (request == nullptr || isStop_)
+            if (request == nullptr || isStop_.load())
                 continue;
             
             request();
