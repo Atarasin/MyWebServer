@@ -55,9 +55,6 @@ public:
         return readIdx_;
     }
 
-    /*
-        不可以修改buffer内容
-    */
     const char* beginPtrConst() const {
         return &*buffer_.begin();
     }
@@ -70,9 +67,6 @@ public:
         return beginPtrConst() + writeIdx_;
     }
 
-    /*
-        可以修改buffer内容
-    */
     char* beginPtr() {
         return &*buffer_.begin();
     }
@@ -128,8 +122,8 @@ public:
         writeIdx_ += nBytes;
     }
 
-    ssize_t readFd(int fd, int* saveErrno = nullptr);   // fd -> buffer
-    ssize_t writeFd(int fd, int* saveErrno = nullptr);  // buffer -> fd
+    ssize_t readFromFd(int fd, int* saveErrno = nullptr);   // fd -> buffer
+    ssize_t writeToFd(int fd, int* saveErrno = nullptr);  // buffer -> fd
 
 private:
     void makeSpace(size_t nBytes);

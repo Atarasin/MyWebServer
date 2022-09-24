@@ -2,3 +2,4 @@
 build
 logs/*
 include/memory_pool.hpp
+include/cache

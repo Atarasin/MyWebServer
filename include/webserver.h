@@ -69,7 +69,7 @@ private:
 
     unique_ptr<Epoller> epoller_;
     unique_ptr<TimerMinHeap> timers_;
-    unique_ptr<ThreadPool<taskCallback>> threadPool_;
+    unique_ptr<ThreadPool> threadPool_;
     unique_ptr<LFUDbCache> lfuDbCache_;
 
     unique_ptr<HttpConnection[]> users_;                        // HTTP连接池

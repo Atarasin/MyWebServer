@@ -32,7 +32,7 @@ void Epoller::removefd(int fd) {
 }
 
 void Epoller::modfd(int fd, uint32_t ev, bool isET, bool oneshot) {
-    epoll_event event;
+    epoll_event event;                  // 每次都是重新设置一个新的事件结构体
     event.data.fd = fd;
 
     event.events = ev | EPOLLRDHUP; 

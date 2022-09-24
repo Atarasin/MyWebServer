@@ -24,10 +24,10 @@ void Buffer::makeSpace(size_t nBytes) {
         throw runtime_error("Buffer::makeSpace: data has been lost.");
 }
 
-ssize_t Buffer::readFd(int fd, int* saveErrno) {
+ssize_t Buffer::readFromFd(int fd, int* saveErrno) {
     const size_t writable = writableBytes();
     if (writable <= 0)
-        throw runtime_error("Buffer::readFd: this is no available bytes to read.");
+        throw runtime_error("Buffer::readFromFd: this is no available bytes to read.");
 
     char extraStk[65536];       // 64KB
     struct iovec vec[2];
@@ -53,10 +53,10 @@ ssize_t Buffer::readFd(int fd, int* saveErrno) {
     return len;
 }
 
-ssize_t Buffer::writeFd(int fd, int* saveErrno) {
+ssize_t Buffer::writeToFd(int fd, int* saveErrno) {
     size_t readable = readableBytes();
     if (readable <= 0)
-        throw runtime_error("Buffer::writeFd: this is no available bytes to write.");
+        throw runtime_error("Buffer::writeToFd: this is no available bytes to write.");
 
     ssize_t len = write(fd, beginPtr() + readIdx_, readable);
     if (len < 0) {

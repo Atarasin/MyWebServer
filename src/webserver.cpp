@@ -4,7 +4,7 @@ const vector<string> WebServer::watchDbs {"mydatabase", "webserver"};
 
 WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sqlUser, string sqlPasswd, string sqlDataBaseName) : 
     port_(port), isET_(isET), epoller_(new Epoller()), timers_(new TimerMinHeap(timeout)),
-    threadPool_(new ThreadPool<taskCallback>()), lfuDbCache_(new LFUDbCache(2)),
+    threadPool_(new ThreadPool()), lfuDbCache_(new LFUDbCache(2)),
     users_(new HttpConnection[maxHttpConns_]),
     usersData_(new client_data[maxHttpConns_]) {
 
@@ -291,7 +291,7 @@ bool WebServer::dealReadEvent(int sockfd) {
 
     // 若接收失败, 则关闭TCP连接 (=0说明对方断开连接)
     if (len <= 0 && (readErrno != EAGAIN && readErrno != EWOULDBLOCK)) {
-        DEBUG_INFO(strerror(readErrno)); 
+        DEBUG_INFO(cout << strerror(readErrno) << endl); 
         closeConnection(sockfd);
         return false;
     }
@@ -390,6 +390,7 @@ void WebServer::start() {
             }
             // 错误事件
             else if (trigerEvent & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
+                DEBUG_INFO(cout << "error event" << "(" << hex << trigerEvent << ")..." << endl);
                 closeConnection(sockfd);
             }
             // 读事件

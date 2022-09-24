@@ -74,7 +74,7 @@ ssize_t HttpConnection::httpRead(int* saveErrno) {
     ssize_t len = -1;
 
     do {
-        len = readBuffer_.readFd(clientInfo_.sockfd, saveErrno);
+        len = readBuffer_.readFromFd(clientInfo_.sockfd, saveErrno);
         if (len <= 0) break;
     } while (isEt);
 
@@ -118,11 +118,12 @@ ssize_t HttpConnection::httpWrite(int* saveErrno) {
 // readBuffer_ -> process -> writeBuffer_
 // ture -> 写事件, false -> 读事件
 bool HttpConnection::httpProcess() {
+    // readBuffer_ -> process
     HTTP_CODE rqcode = parseRequest();
-    // cout << "HTTP_CODE: " << rqcode << endl;
     if (rqcode == NO_REQUEST)
         return false;
     
+    // process -> writeBuffer_
     if (!writeResponse(rqcode))
         return false;
     

@@ -26,7 +26,7 @@ void testBuffer() {
         lseek(fd, 0, SEEK_SET);
 
         cout << "start to write bytes into buffer." << endl;
-        cout << "readFd: " << buffer.readFd(fd) << endl;
+        cout << "readFromFd: " << buffer.readFromFd(fd) << endl;
         cout << "---------------------- buffer --------------------" << endl;
         cout << "buffer readable: " << buffer.readableBytes() << endl;
         cout << "buffer writable: " << buffer.writableBytes() << endl;
@@ -43,7 +43,7 @@ void testBuffer() {
 
         // // 打印数据
         // cout << "start to read bytes from buffer." << endl;
-        // cout << "writeFd: " << buffer.writeFd(STDOUT_FILENO) << endl;
+        // cout << "writeToFd: " << buffer.writeToFd(STDOUT_FILENO) << endl;
         // cout << "---------------------- buffer --------------------" << endl;
         // cout << "buffer readable: " << buffer.readableBytes() << endl;
         // cout << "buffer writable: " << buffer.writableBytes() << endl;
