@@ -9,9 +9,18 @@ option(IS_DEBUG "debug info something" OFF)
 if(IS_DEBUG)
     message(STATUS "DEBUG MODE ON")
     add_compile_definitions(DEBUG_MODE)
+    set(CMAKE_BUILD_TYPE "Debug")           # 转为调试模式
 else()
     message(STATUS "DEBUG MODE OFF")
 endif()
+
+# 添加GDB调试信息
+# set(CMAKE_BUILD_TYPE "Debug")  
+set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -g2 -ggdb")  
+set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3")
+message(STATUS "Build type:${CMAKE_BUILD_TYPE}")
+message(STATUS "Debug configuration:${CMAKE_CXX_FLAGS_DEBUG}")
+message(STATUS "release configuration:${CMAKE_CXX_FLAGS_RELEASE}")
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     message(STATUS "Configuring on/for Linux")

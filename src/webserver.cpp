@@ -1,6 +1,6 @@
 #include "../include/webserver.h"
 
-const vector<string> WebServer::watchDbs {"mydatabase", "webserver"};
+const vector<string> WebServer::watchDbs {"webserver"};
 
 WebServer::WebServer(int port, int timeout, bool isAsynLog, bool isET, string sqlUser, string sqlPasswd, string sqlDataBaseName) : 
     port_(port), isET_(isET), epoller_(new Epoller()), timers_(new TimerMinHeap(timeout)),

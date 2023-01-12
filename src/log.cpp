@@ -1,6 +1,6 @@
 #include "../include/log.h"
 
-static const char* logRootPath = "/home/zh/AtarasinGitRep/MyWebServer/logs";
+static const char* logRootPath = "/home/zh99/Projects/MyWebServer/logs";
 
 // 异步需要设置阻塞队列的长度，同步不需要设置
 bool Log::init(const string& logName, int splitLines, int maxQueueSize) {

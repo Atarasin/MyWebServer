@@ -11,7 +11,7 @@ static const char *error_500_title = "Internal Error";
 static const char *error_500_form = "There was an unusual problem serving the request file.\n";
 
 // 静态成员变量
-string HttpConnection::rootPath = "/home/zh/AtarasinGitRep/MyWebServer/resources/";
+string HttpConnection::rootPath = "/home/zh99/Projects/MyWebServer/resources/";
 bool HttpConnection::isEt = false;
 int HttpConnection::userCount = 0;
 regex HttpConnection::rqLineRule = regex("^([^ ]*) ([^ ]*) HTTP/([^ ]*)$");
